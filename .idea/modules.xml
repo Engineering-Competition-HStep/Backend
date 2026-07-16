@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Hstep.iml" filepath="$PROJECT_DIR$/.idea/Hstep.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.main.iml" filepath="$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.main.iml" />
     </modules>
   </component>
 </project>
