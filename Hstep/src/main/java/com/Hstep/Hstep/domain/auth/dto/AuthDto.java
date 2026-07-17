@@ -26,7 +26,7 @@ public class AuthDto {
         @NotNull(message = "학번은 필수 입력 값입니다.")
         @Min(value = 1_000_000L, message = "학번 형식을 확인해주세요.")
         @Max(value = 9_999_999_999L, message = "학번 형식을 확인해주세요.")
-        private Long userId;
+        private String userId;
 
         @NotBlank(message = "학교 이메일은 필수 입력 값입니다.")
         @Email(message = "이메일 형식이 올바르지 않습니다.")
@@ -63,7 +63,7 @@ public class AuthDto {
 
         @NotNull(message = "학번을 입력해주세요.")
         @Positive(message = "학번 형식을 확인해주세요.")
-        private Long userId;
+        private String userId;
 
         @NotBlank(message = "비밀번호를 입력해주세요.")
         private String password;
