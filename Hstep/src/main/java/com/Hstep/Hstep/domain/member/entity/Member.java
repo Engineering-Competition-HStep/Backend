@@ -27,7 +27,7 @@ public class Member extends BaseEntity {
 
     @Id
     @Column(name = "user_id", nullable = false)
-    private Long userId;
+    private String userId;
 
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
@@ -58,7 +58,7 @@ public class Member extends BaseEntity {
     private List<MemberTrack> memberTracks = new ArrayList<>();
 
     private Member(
-            Long userId,
+            String userId,
             String email,
             String encodedPassword,
             String name,
@@ -74,7 +74,7 @@ public class Member extends BaseEntity {
     }
 
     public static Member create(
-            Long userId,
+            String userId,
             String email,
             String encodedPassword,
             String name,
