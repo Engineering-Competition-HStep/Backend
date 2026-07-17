@@ -76,7 +76,7 @@ public class AuthService {
     }
 
     @Transactional(readOnly = true)
-    public CheckAvailableRes checkUserId(Long userId) {
+    public CheckAvailableRes checkUserId(String userId) {
         if (memberRepository.existsById(userId)) {
             throw new BaseException(AuthResponseCode.USER_ID_DUPLICATION);
         }
@@ -93,7 +93,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void changePassword(Long userId, ChangePasswordReq changePasswordReq) {
+    public void changePassword(String userId, ChangePasswordReq changePasswordReq) {
         Member member = memberRepository.findById(userId)
                 .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
 
