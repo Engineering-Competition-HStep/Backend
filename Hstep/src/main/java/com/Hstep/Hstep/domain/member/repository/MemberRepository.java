@@ -8,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 
-public interface MemberRepository extends JpaRepository<Member, Long> {
+public interface MemberRepository extends JpaRepository<Member, String> {
 
     Optional<Member> findByEmail(String email);
 
@@ -16,5 +16,5 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     @EntityGraph(attributePaths = "memberTracks")
     @Query("select member from Member member where member.userId = :userId")
-    Optional<Member> findWithTracksByUserId(@Param("userId") Long userId);
+    Optional<Member> findWithTracksByUserId(String userId);
 }

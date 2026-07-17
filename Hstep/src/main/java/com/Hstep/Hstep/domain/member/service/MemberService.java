@@ -19,12 +19,12 @@ public class MemberService {
     private final MemberRepository memberRepository;
 
     @Transactional(readOnly = true)
-    public MemberRes getMe(Long userId) {
+    public MemberRes getMe(String userId) {
         return MemberRes.fromEntity(getMemberWithTracks(userId));
     }
 
     @Transactional
-    public MemberRes updateMe(Long userId, UpdateReq updateReq) {
+    public MemberRes updateMe(String userId, UpdateReq updateReq) {
         Member member = getMemberWithTracks(userId);
 
         member.updateProfile(updateReq.getName(), updateReq.getGrade(), updateReq.getGpa());
@@ -38,13 +38,13 @@ public class MemberService {
     }
 
     @Transactional
-    public void deleteMe(Long userId) {
+    public void deleteMe(String userId) {
         Member member = memberRepository.findById(userId)
                 .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
         memberRepository.delete(member);
     }
 
-    private Member getMemberWithTracks(Long userId) {
+    private Member getMemberWithTracks(String userId) {
         return memberRepository.findWithTracksByUserId(userId)
                 .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
     }
