@@ -51,9 +51,8 @@ public class AuthController {
     @GetMapping("/check/student-number")
     public SuccessResponse<CheckAvailableRes> checkUserId(
             @RequestParam
-            @Min(value = 1_000_000L, message = "학번 형식을 확인해주세요.")
-            @Max(value = 9_999_999_999L, message = "학번 형식을 확인해주세요.")
-            Long userId
+            @Pattern(regexp = "^\\d{7,10}$", message = "학번 형식을 확인해주세요.")
+            String userId
     ) {
         return SuccessResponse.of(
                 authService.checkUserId(userId),

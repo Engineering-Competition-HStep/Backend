@@ -48,8 +48,8 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public Long getUserId(String token) {
-        return Long.valueOf(parseClaims(token).getSubject());
+    public String getUserId(String token) {
+        return String.valueOf(parseClaims(token).getSubject());
     }
 
     public void validateToken(String token) {

@@ -13,11 +13,11 @@ import java.util.List;
 @Getter
 public class MemberPrincipal implements UserDetails {
 
-    private final Long userId;
+    private final String userId;
     private final String password;
     private final MemberRole role;
 
-    private MemberPrincipal(Long userId, String password, MemberRole role) {
+    private MemberPrincipal(String userId, String password, MemberRole role) {
         this.userId = userId;
         this.password = password;
         this.role = role;

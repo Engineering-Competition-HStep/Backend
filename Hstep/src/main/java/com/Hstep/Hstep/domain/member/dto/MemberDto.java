@@ -44,7 +44,7 @@ public class MemberDto {
     @Builder
     @AllArgsConstructor
     public static class MemberRes {
-        private Long userId;
+        private String userId;
         private String email;
         private String name;
         private Integer grade;
