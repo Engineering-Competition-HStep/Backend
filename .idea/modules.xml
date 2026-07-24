@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.iml" filepath="$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.main.iml" filepath="$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.test.iml" filepath="$PROJECT_DIR$/.idea/modules/com.Hstep.Hstep.test.iml" />
+    </modules>
+  </component>
+</project>
