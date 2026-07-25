@@ -20,11 +20,21 @@ public class BaseRoadmapItem extends BaseEntity {
     @Column(name = "item_order", nullable = false)
     private Integer itemOrder;
 
+    @Column(name = "grade", nullable = false)
+    private Integer grade;
+
+    @Column(name = "semester", nullable = false)
+    private Integer semester;
+
+    @Column(name = "category", nullable = false, length = 100)
+    private String category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "level", nullable = false, length = 20)
+    private RoadmapLevel level;
+
     @Column(name = "title", nullable = false, length = 100)
     private String title;
-
-    @Column(name = "grade")
-    private Integer grade;
 
     @Column(name = "description", length = 1000)
     private String description;
@@ -33,18 +43,30 @@ public class BaseRoadmapItem extends BaseEntity {
     @JoinColumn(name = "roadmap_id", nullable = false)
     private BaseRoadmap baseRoadmap;
 
-    public BaseRoadmapItem(Integer itemOrder, String title, Integer grade, String description, BaseRoadmap baseRoadmap) {
+    public BaseRoadmapItem(
+            Integer itemOrder, Integer grade, Integer semester, String category,
+            RoadmapLevel level, String title, String description, BaseRoadmap baseRoadmap
+    ) {
         this.itemOrder = itemOrder;
-        this.title = title;
         this.grade = grade;
+        this.semester = semester;
+        this.category = category;
+        this.level = level;
+        this.title = title;
         this.description = description;
         this.baseRoadmap = baseRoadmap;
     }
 
-    public void update(Integer itemOrder, String title, Integer grade, String description) {
+    public void update(
+            Integer itemOrder, Integer grade, Integer semester, String category,
+            RoadmapLevel level, String title, String description
+    ) {
         this.itemOrder = itemOrder;
-        this.title = title;
         this.grade = grade;
+        this.semester = semester;
+        this.category = category;
+        this.level = level;
+        this.title = title;
         this.description = description;
     }
 }
