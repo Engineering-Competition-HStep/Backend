@@ -4,7 +4,9 @@ import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.ExtraActivityDto;
 import com.Hstep.Hstep.domain.profile.entity.ExtraActivity;
+import com.Hstep.Hstep.domain.profile.exception.ProfileResponseCode;
 import com.Hstep.Hstep.domain.profile.repository.ExtraActivityRepository;
+import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,14 +37,14 @@ public class ExtraActivityService {
     @Transactional
     public void update(Long activityId, ExtraActivityDto.Request request) {
         ExtraActivity activity = extraActivityRepository.findById(activityId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 활동입니다. id=" + activityId));
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.EXTRA_ACTIVITY_NOT_FOUND));
         activity.update(request.activityName(), request.fieldKeyword(), request.period(), request.description());
     }
 
     @Transactional
     public void delete(Long activityId) {
         if (!extraActivityRepository.existsById(activityId)) {
-            throw new IllegalArgumentException("존재하지 않는 활동입니다. id=" + activityId);
+            throw new BaseException(ProfileResponseCode.EXTRA_ACTIVITY_NOT_FOUND);
         }
         extraActivityRepository.deleteById(activityId);
     }

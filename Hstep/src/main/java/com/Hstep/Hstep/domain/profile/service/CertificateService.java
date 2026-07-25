@@ -4,7 +4,9 @@ import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.CertificateDto;
 import com.Hstep.Hstep.domain.profile.entity.Certificate;
+import com.Hstep.Hstep.domain.profile.exception.ProfileResponseCode;
 import com.Hstep.Hstep.domain.profile.repository.CertificateRepository;
+import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +36,14 @@ public class CertificateService {
     @Transactional
     public void update(Long certificateId, CertificateDto.Request request) {
         Certificate certificate = certificateRepository.findById(certificateId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 자격증입니다. id=" + certificateId));
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.CERTIFICATE_NOT_FOUND));
         certificate.update(request.certificateName(), request.issuedYear());
     }
 
     @Transactional
     public void delete(Long certificateId) {
         if (!certificateRepository.existsById(certificateId)) {
-            throw new IllegalArgumentException("존재하지 않는 자격증입니다. id=" + certificateId);
+            throw new BaseException(ProfileResponseCode.CERTIFICATE_NOT_FOUND);
         }
         certificateRepository.deleteById(certificateId);
     }

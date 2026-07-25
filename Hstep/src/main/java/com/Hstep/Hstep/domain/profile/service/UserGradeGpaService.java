@@ -1,10 +1,13 @@
 package com.Hstep.Hstep.domain.profile.service;
 
 import com.Hstep.Hstep.domain.member.entity.Member;
+import com.Hstep.Hstep.domain.member.exception.MemberResponseCode;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.UserGradeGpaDto;
 import com.Hstep.Hstep.domain.profile.entity.UserGradeGpa;
+import com.Hstep.Hstep.domain.profile.exception.ProfileResponseCode;
 import com.Hstep.Hstep.domain.profile.repository.UserGradeGpaRepository;
+import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,6 @@ public class UserGradeGpaService {
     private final UserGradeGpaRepository userGradeGpaRepository;
     private final MemberRepository memberRepository;
 
-    // 학년 하나 저장 (있으면 수정, 없으면 생성)
     @Transactional
     public Long save(String userId, UserGradeGpaDto.Request request) {
         Long id = upsert(userId, request);
@@ -29,7 +31,6 @@ public class UserGradeGpaService {
         return id;
     }
 
-    // 여러 학년 내용 한 번에 저장 (마이페이지 '저장하기' 버튼)
     @Transactional
     public void saveAll(String userId, List<UserGradeGpaDto.Request> requests) {
         requests.forEach(request -> upsert(userId, request));
@@ -38,10 +39,10 @@ public class UserGradeGpaService {
 
     private Long upsert(String userId, UserGradeGpaDto.Request request) {
         Member member = memberRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다. userId=" + userId));
+                .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
 
         if (request.grade() > member.getGrade()) {
-            throw new IllegalArgumentException("현재 학년보다 높은 학년의 학점은 입력할 수 없습니다.");
+            throw new BaseException(ProfileResponseCode.INVALID_GRADE);
         }
 
         return userGradeGpaRepository.findByMember_UserIdAndGrade(userId, request.grade())
@@ -65,7 +66,7 @@ public class UserGradeGpaService {
     @Transactional
     public void delete(Long userGradeGpaId) {
         UserGradeGpa entity = userGradeGpaRepository.findById(userGradeGpaId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 학년별 평균 학점입니다. id=" + userGradeGpaId));
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.USER_GRADE_GPA_NOT_FOUND));
         String userId = entity.getMember().getUserId();
         userGradeGpaRepository.deleteById(userGradeGpaId);
         recalculateOverallGpa(userId);
@@ -74,7 +75,7 @@ public class UserGradeGpaService {
     private void recalculateOverallGpa(String userId) {
         List<UserGradeGpa> gradeGpas = userGradeGpaRepository.findByMember_UserId(userId);
         Member member = memberRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다. userId=" + userId));
+                .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
 
         if (gradeGpas.isEmpty()) {
             member.updateGpa(null);

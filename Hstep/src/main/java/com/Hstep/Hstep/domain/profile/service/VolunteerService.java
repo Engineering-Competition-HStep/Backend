@@ -4,7 +4,9 @@ import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.VolunteerDto;
 import com.Hstep.Hstep.domain.profile.entity.Volunteer;
+import com.Hstep.Hstep.domain.profile.exception.ProfileResponseCode;
 import com.Hstep.Hstep.domain.profile.repository.VolunteerRepository;
+import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +36,14 @@ public class VolunteerService {
     @Transactional
     public void update(Long volunteerId, VolunteerDto.Request request) {
         Volunteer volunteer = volunteerRepository.findById(volunteerId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 봉사활동입니다. id=" + volunteerId));
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.VOLUNTEER_NOT_FOUND));
         volunteer.update(request.volunteerName(), request.volunteerHours(), request.description());
     }
 
     @Transactional
     public void delete(Long volunteerId) {
         if (!volunteerRepository.existsById(volunteerId)) {
-            throw new IllegalArgumentException("존재하지 않는 봉사활동입니다. id=" + volunteerId);
+            throw new BaseException(ProfileResponseCode.VOLUNTEER_NOT_FOUND);
         }
         volunteerRepository.deleteById(volunteerId);
     }

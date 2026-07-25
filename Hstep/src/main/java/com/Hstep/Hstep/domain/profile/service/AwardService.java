@@ -4,7 +4,9 @@ import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.AwardDto;
 import com.Hstep.Hstep.domain.profile.entity.Award;
+import com.Hstep.Hstep.domain.profile.exception.ProfileResponseCode;
 import com.Hstep.Hstep.domain.profile.repository.AwardRepository;
+import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +36,14 @@ public class AwardService {
     @Transactional
     public void update(Long awardId, AwardDto.Request request) {
         Award award = awardRepository.findById(awardId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 수상경력입니다. id=" + awardId));
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.AWARD_NOT_FOUND));
         award.update(request.competitionName(), request.awardName(), request.awardRank(), request.description());
     }
 
     @Transactional
     public void delete(Long awardId) {
         if (!awardRepository.existsById(awardId)) {
-            throw new IllegalArgumentException("존재하지 않는 수상경력입니다. id=" + awardId);
+            throw new BaseException(ProfileResponseCode.AWARD_NOT_FOUND);
         }
         awardRepository.deleteById(awardId);
     }
