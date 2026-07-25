@@ -24,7 +24,7 @@ public class Track {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "track_id")
-    private Integer trackId;
+    private Long trackId;
 
     @Column(name = "track_code", nullable = false, length = 100)
     private String trackCode;

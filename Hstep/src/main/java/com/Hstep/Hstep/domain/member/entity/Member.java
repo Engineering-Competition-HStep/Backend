@@ -106,4 +106,8 @@ public class Member extends BaseEntity {
             memberTracks.add(MemberTrack.create(this, trackIds.get(index), index + 1));
         }
     }
+
+    public void updateGpa(BigDecimal gpa) {
+        this.gpa = gpa;
+    }
 }
