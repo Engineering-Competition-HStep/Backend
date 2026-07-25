@@ -29,7 +29,7 @@ public class UserGradeGpaService {
         return id;
     }
 
-    // 여러 학년 내용 한 번에 저장 (마이페이지 "저장하기" 버튼)
+    // 여러 학년 내용 한 번에 저장 (마이페이지 '저장하기' 버튼)
     @Transactional
     public void saveAll(String userId, List<UserGradeGpaDto.Request> requests) {
         requests.forEach(request -> upsert(userId, request));
@@ -37,13 +37,19 @@ public class UserGradeGpaService {
     }
 
     private Long upsert(String userId, UserGradeGpaDto.Request request) {
+        Member member = memberRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다. userId=" + userId));
+
+        if (request.grade() > member.getGrade()) {
+            throw new IllegalArgumentException("현재 학년보다 높은 학년의 학점은 입력할 수 없습니다.");
+        }
+
         return userGradeGpaRepository.findByMember_UserIdAndGrade(userId, request.grade())
                 .map(existing -> {
                     existing.update(request.gpa());
                     return existing.getUserGradeGpaId();
                 })
                 .orElseGet(() -> {
-                    Member member = memberRepository.getReferenceById(userId);
                     UserGradeGpa entity = userGradeGpaRepository.save(
                             new UserGradeGpa(request.grade(), request.gpa(), member));
                     return entity.getUserGradeGpaId();
