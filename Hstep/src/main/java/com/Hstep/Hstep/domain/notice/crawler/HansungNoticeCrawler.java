@@ -47,15 +47,57 @@ public class HansungNoticeCrawler {
             NoticeBoard board,
             int page
     ) throws IOException {
-        Document document = Jsoup.connect(board.pageUrl(page))
-                .userAgent(userAgent)
-                .header("Accept-Language", "ko-KR,ko;q=0.9")
-                .referrer(board.getListUrl())
-                .timeout(timeoutMs)
-                .followRedirects(true)
-                .get();
 
-        return parseDocument(document, board);
+        int maxAttempts = 3;
+        IOException lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                Document document = Jsoup.connect(board.pageUrl(page))
+                        .userAgent(userAgent)
+                        .header("Accept-Language", "ko-KR,ko;q=0.9")
+                        .header(
+                                "Accept",
+                                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                        )
+                        .referrer(board.getListUrl())
+                        .timeout(timeoutMs)
+                        .followRedirects(true)
+                        .get();
+
+                return parseDocument(document, board);
+
+            } catch (IOException exception) {
+                lastException = exception;
+
+                if (attempt == maxAttempts) {
+                    break;
+                }
+
+                long waitTime = 1500L * attempt;
+
+                try {
+                    Thread.sleep(waitTime);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+
+                    throw new IOException(
+                            "크롤링 재시도 대기 중 인터럽트가 발생했습니다.",
+                            interruptedException
+                    );
+                }
+            }
+        }
+
+        throw new IOException(
+                board.name()
+                        + " "
+                        + page
+                        + "페이지 요청이 "
+                        + maxAttempts
+                        + "회 모두 실패했습니다.",
+                lastException
+        );
     }
 
     /**
