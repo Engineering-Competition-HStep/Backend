@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface UserGradeGpaRepository extends JpaRepository<UserGradeGpa, Long> {
     List<UserGradeGpa> findByMember_UserId(String userId);
     Optional<UserGradeGpa> findByMember_UserIdAndGrade(String userId, Integer grade);
+    Optional<UserGradeGpa> findByUserGradeGpaIdAndMember_UserId(Long userGradeGpaId, String userId);
 }

@@ -64,10 +64,9 @@ public class UserGradeGpaService {
     }
 
     @Transactional
-    public void delete(Long userGradeGpaId) {
-        UserGradeGpa entity = userGradeGpaRepository.findById(userGradeGpaId)
+    public void delete(String userId, Long userGradeGpaId) {
+        UserGradeGpa entity = userGradeGpaRepository.findByUserGradeGpaIdAndMember_UserId(userGradeGpaId, userId)
                 .orElseThrow(() -> new BaseException(ProfileResponseCode.USER_GRADE_GPA_NOT_FOUND));
-        String userId = entity.getMember().getUserId();
         userGradeGpaRepository.deleteById(userGradeGpaId);
         recalculateOverallGpa(userId);
     }
