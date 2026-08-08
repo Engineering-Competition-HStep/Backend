@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -141,6 +140,7 @@ public class AiRoadmapService {
 
         String corpus = profileAnalyzer.buildProfileCorpus(userId);
         List<AiRoadmapItem> items = standards.stream()
+                .filter(AiRoadmapStandardItem::isRequiredItem)
                 .map(standard -> AiRoadmapItem.create(roadmap, standard, resolveStatus(standard, corpus), false))
                 .toList();
         aiRoadmapItemRepository.saveAll(items);
