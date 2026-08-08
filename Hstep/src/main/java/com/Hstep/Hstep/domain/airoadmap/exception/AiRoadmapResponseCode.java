@@ -22,6 +22,7 @@ public enum AiRoadmapResponseCode implements BaseResponseCode {
     JOB_NOT_FOUND("AI_ROADMAP_404_5", NOT_FOUND, "직무를 찾을 수 없습니다."),
     RECOMMENDATION_NOT_FOUND("AI_ROADMAP_404_6", NOT_FOUND, "추천 가능한 직무가 없습니다."),
     PROPOSAL_NOT_FOUND("AI_ROADMAP_404_7", NOT_FOUND, "변경 제안을 찾을 수 없습니다."),
+    GEMINI_CALL_FAILED("AI_ROADMAP_500_1", INTERNAL_SERVER_ERROR, "AI 로드맵 채팅 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."),
 
     ELIGIBILITY_GET_SUCCESS("AI_ROADMAP_200_1", OK, "AI 로드맵 이용 가능 여부를 조회했습니다."),
     PROFILE_REGISTRATION_SUCCESS("AI_ROADMAP_200_2", OK, "개인 스펙 등록 상태를 저장했습니다."),
