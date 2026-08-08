@@ -57,7 +57,7 @@ public class AiRoadmapController {
             @Valid @RequestBody AiRoadmapDto.CreateRoadmapRequest request
     ) {
         return SuccessResponse.of(
-                aiRoadmapService.createOrReplace(principal.getUserId(), request.jobId()),
+                aiRoadmapService.createInitialRoadmap(principal.getUserId(), request.jobId()),
                 AiRoadmapResponseCode.ROADMAP_CREATE_SUCCESS
         );
     }
