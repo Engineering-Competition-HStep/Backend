@@ -3,19 +3,21 @@ package com.Hstep.Hstep.domain.airoadmap.service;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapChangeProposal;
 import com.Hstep.Hstep.domain.airoadmap.exception.AiRoadmapResponseCode;
 import com.Hstep.Hstep.global.exception.BaseException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
 
 @Component
 @Primary
 @RequiredArgsConstructor
+@Slf4j
 public class GeminiAiRoadmapIntentClassifier implements AiRoadmapIntentClassifier {
 
     private final ChatModel chatModel;
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
     @Override
     public AiRoadmapChangeProposal.ActionType classify(String message) {
@@ -25,12 +27,25 @@ public class GeminiAiRoadmapIntentClassifier implements AiRoadmapIntentClassifie
 
         try {
             String response = chatModel.call(buildPrompt(message));
-            GeminiIntentResponse intentResponse = objectMapper.readValue(
+            log.debug("Gemini roadmap intent response={}", response);
+
+            GeminiIntentResponse intentResponse = jsonMapper.readValue(
                     extractJson(response),
                     GeminiIntentResponse.class
             );
-            return AiRoadmapChangeProposal.ActionType.valueOf(intentResponse.actionType());
+
+            if (intentResponse.actionType() == null || intentResponse.actionType().isBlank()) {
+                throw new IllegalArgumentException("Gemini response actionType is empty.");
+            }
+
+            return AiRoadmapChangeProposal.ActionType.valueOf(intentResponse.actionType().trim());
         } catch (Exception exception) {
+            log.error(
+                    "Gemini roadmap intent classification failed. exceptionType={}, message={}",
+                    exception.getClass().getName(),
+                    exception.getMessage(),
+                    exception
+            );
             throw new BaseException(AiRoadmapResponseCode.GEMINI_CALL_FAILED);
         }
     }
