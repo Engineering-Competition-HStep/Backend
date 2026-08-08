@@ -41,22 +41,13 @@ public class JobDataInitializer {
     }
 
     /**
-     * TRACK 초기화 로직이 ApplicationRunner/CommandLineRunner로 실행된 뒤 동작하도록
-     * ApplicationReadyEvent 시점에 실행합니다.
-     *
-     * JOB 테이블에 데이터가 하나라도 있으면 아무 작업도 하지 않습니다.
+     * TRACK 초기화 로직이 ApplicationRunner/CommandLineRunner로 실행된 뒤 동작합니다.
+     * 기존 JOB/JOB_TRACK 데이터가 있어도 누락된 직무와 연결만 추가하여 여러 번 실행해도 안전하게 유지합니다.
      */
     @Order(200)
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void initialize() {
-        long existingJobCount = jobRepository.count();
-
-        if (existingJobCount > 0) {
-            log.info("JOB 초기 데이터를 건너뜁니다. existingJobCount={}", existingJobCount);
-            return;
-        }
-
         List<Track> tracks = trackRepository.findAll();
 
         if (tracks.isEmpty()) {
@@ -94,19 +85,32 @@ public class JobDataInitializer {
             return;
         }
 
-        /*
-         * 같은 직무가 여러 트랙에 연결될 수 있으므로 JOB에는 한 번만 저장합니다.
-         * 같은 직무가 서로 다른 카테고리로 선언된 경우 카탈로그에서 먼저 등장한 값을 사용합니다.
-         */
-        Map<String, JobSeed> uniqueJobSeeds = new LinkedHashMap<>();
+        Set<Long> matchedTrackIds = resolvedSeeds.stream()
+                .map(resolved -> resolved.track().getTrackId())
+                .collect(Collectors.toSet());
+        List<String> unmatchedDbTracks = tracks.stream()
+                .filter(track -> !matchedTrackIds.contains(track.getTrackId()))
+                .map(Track::getTrackName)
+                .toList();
 
+        Map<String, JobSeed> uniqueJobSeeds = new LinkedHashMap<>();
         for (ResolvedTrackSeed resolved : resolvedSeeds) {
             for (JobSeed seed : resolved.jobs()) {
                 uniqueJobSeeds.putIfAbsent(seed.jobName(), seed);
             }
         }
 
-        List<Job> jobs = uniqueJobSeeds.values().stream()
+        Map<String, Job> jobByName = jobRepository.findAllByOrderByJobNameAsc().stream()
+                .collect(Collectors.toMap(
+                        Job::getJobName,
+                        Function.identity(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+        int existingJobCount = jobByName.size();
+
+        List<Job> missingJobs = uniqueJobSeeds.values().stream()
+                .filter(seed -> !jobByName.containsKey(seed.jobName()))
                 .map(seed -> Job.create(
                         seed.jobName(),
                         seed.category(),
@@ -114,16 +118,17 @@ public class JobDataInitializer {
                 ))
                 .toList();
 
-        List<Job> savedJobs = jobRepository.saveAllAndFlush(jobs);
+        if (!missingJobs.isEmpty()) {
+            for (Job savedJob : jobRepository.saveAllAndFlush(missingJobs)) {
+                jobByName.put(savedJob.getJobName(), savedJob);
+            }
+        }
 
-        Map<String, Job> jobByName = savedJobs.stream()
-                .collect(Collectors.toMap(
-                        Job::getJobName,
-                        Function.identity(),
-                        (first, ignored) -> first
-                ));
+        Set<String> existingLinkKeys = jobTrackRepository.findAll().stream()
+                .map(link -> linkKey(link.getTrack().getTrackId(), link.getJob().getJobId()))
+                .collect(Collectors.toSet());
 
-        List<JobTrack> links = new ArrayList<>();
+        List<JobTrack> missingLinks = new ArrayList<>();
 
         for (ResolvedTrackSeed resolved : resolvedSeeds) {
             Set<String> duplicatedLinkGuard = new HashSet<>();
@@ -134,31 +139,44 @@ public class JobDataInitializer {
                 }
 
                 Job job = jobByName.get(seed.jobName());
-
                 if (job == null) {
                     throw new IllegalStateException(
                             "저장된 직무를 찾지 못했습니다. jobName=" + seed.jobName()
                     );
                 }
 
-                links.add(JobTrack.create(resolved.track(), job));
+                String linkKey = linkKey(resolved.track().getTrackId(), job.getJobId());
+                if (existingLinkKeys.add(linkKey)) {
+                    missingLinks.add(JobTrack.create(resolved.track(), job));
+                }
             }
         }
 
-        jobTrackRepository.saveAll(links);
+        if (!missingLinks.isEmpty()) {
+            jobTrackRepository.saveAll(missingLinks);
+        }
 
         log.info(
-                "JOB/JOB_TRACK 초기화 완료. matchedTracks={}, jobs={}, jobTrackLinks={}",
+                "JOB/JOB_TRACK 동기화 완료. matchedTracks={}, existingJobs={}, createdJobs={}, createdJobTrackLinks={}",
                 resolvedSeeds.size(),
-                savedJobs.size(),
-                links.size()
+                existingJobCount,
+                missingJobs.size(),
+                missingLinks.size()
         );
 
         if (!unmatchedCatalogTracks.isEmpty()) {
             log.info(
-                    "DB에 존재하지 않아 연결하지 않은 카탈로그 트랙 수={}, tracks={}",
+                    "DB에 존재하지 않아 연결하지 않은 JobSeedCatalog 트랙 수={}, tracks={}",
                     unmatchedCatalogTracks.size(),
                     unmatchedCatalogTracks
+            );
+        }
+
+        if (!unmatchedDbTracks.isEmpty()) {
+            log.info(
+                    "JobSeedCatalog 직무 연결 대상이 아닌 DB 트랙/조직 수={}, tracks={}",
+                    unmatchedDbTracks.size(),
+                    unmatchedDbTracks
             );
         }
     }
@@ -168,6 +186,10 @@ public class JobDataInitializer {
                 + " 직무로, "
                 + seed.category().getDisplayName()
                 + " 분야의 관련 업무를 수행합니다.";
+    }
+
+    private String linkKey(Long trackId, Long jobId) {
+        return trackId + ":" + jobId;
     }
 
     /**
