@@ -48,6 +48,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/roadmaps/base/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/roadmaps/base/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/roadmaps/base/**").hasRole("ADMIN")
+                        .requestMatchers("/api/ai-roadmaps/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
