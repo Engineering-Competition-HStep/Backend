@@ -247,7 +247,7 @@ public class AiRoadmapChatService {
                 .map(item -> completionKey(item.getStandardItem()))
                 .collect(Collectors.toSet());
 
-        aiRoadmapService.createOrReplace(userId, targetJobId);
+        aiRoadmapService.replaceInterestJob(userId, targetJobId);
         AiRoadmap newRoadmap = aiRoadmapService.findRoadmap(userId);
         for (AiRoadmapItem item : aiRoadmapService.getAllItems(newRoadmap)) {
             if (completedKeys.contains(completionKey(item.getStandardItem()))) {
