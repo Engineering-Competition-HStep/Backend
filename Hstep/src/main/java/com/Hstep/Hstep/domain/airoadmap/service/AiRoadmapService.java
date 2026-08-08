@@ -110,41 +110,65 @@ public class AiRoadmapService {
     }
 
     @Transactional
-    public AiRoadmapDto.RoadmapResponse createOrReplace(String userId, Long jobId) {
+    public AiRoadmapDto.RoadmapResponse createInitialRoadmap(String userId, Long jobId) {
         requireEligible(userId);
-        List<Long> recommendedIds = recommendJobs(userId).stream()
-                .map(AiRoadmapDto.JobRecommendationResponse::jobId)
-                .toList();
-        if (!recommendedIds.contains(jobId)) {
-            throw new BaseException(AiRoadmapResponseCode.UNSUPPORTED_ACTION);
+        if (aiRoadmapRepository.existsByMember_UserId(userId)) {
+            throw new BaseException(AiRoadmapResponseCode.AI_ROADMAP_ALREADY_EXISTS);
         }
+        validateRecommendedJob(userId, jobId);
 
         Member member = profileAnalyzer.getMemberWithTracks(userId);
         Job job = findJob(jobId);
+        List<AiRoadmapStandardItem> standards = getStandardsOrThrow(jobId);
+        AiRoadmap roadmap = aiRoadmapRepository.save(AiRoadmap.create(member, job));
+        createRequiredItems(userId, roadmap, standards);
+        return toRoadmapResponse(member, roadmap, null, null);
+    }
+
+    @Transactional
+    AiRoadmapDto.RoadmapResponse replaceInterestJob(String userId, Long jobId) {
+        requireEligible(userId);
+        validateRecommendedJob(userId, jobId);
+
+        Member member = profileAnalyzer.getMemberWithTracks(userId);
+        Job job = findJob(jobId);
+        List<AiRoadmapStandardItem> standards = getStandardsOrThrow(jobId);
+        AiRoadmap roadmap = findRoadmap(userId);
+
+        if (Objects.equals(roadmap.getInterestJob().getJobId(), jobId)) {
+            throw new BaseException(AiRoadmapResponseCode.UNSUPPORTED_ACTION);
+        }
+
+        aiRoadmapItemRepository.deleteAllByAiRoadmap_AiRoadmapId(roadmap.getAiRoadmapId());
+        roadmap.changeInterestJob(job);
+        createRequiredItems(userId, roadmap, standards);
+        return toRoadmapResponse(member, roadmap, null, null);
+    }
+
+    private void validateRecommendedJob(String userId, Long jobId) {
+        boolean recommended = recommendJobs(userId).stream()
+                .anyMatch(job -> Objects.equals(job.jobId(), jobId));
+        if (!recommended) {
+            throw new BaseException(AiRoadmapResponseCode.UNSUPPORTED_ACTION);
+        }
+    }
+
+    private List<AiRoadmapStandardItem> getStandardsOrThrow(Long jobId) {
         List<AiRoadmapStandardItem> standards = standardItemRepository
                 .findAllByJob_JobIdOrderByTargetGradeAscDisplayOrderAsc(jobId);
         if (standards.isEmpty()) {
             throw new BaseException(AiRoadmapResponseCode.STANDARD_ROADMAP_NOT_FOUND);
         }
+        return standards;
+    }
 
-        AiRoadmap roadmap = aiRoadmapRepository.findByMember_UserId(userId)
-                .orElseGet(() -> aiRoadmapRepository.save(AiRoadmap.create(member, job)));
-        if (!Objects.equals(roadmap.getInterestJob().getJobId(), jobId)) {
-            roadmap.changeInterestJob(job);
-            aiRoadmapItemRepository.deleteAllByAiRoadmap_AiRoadmapId(roadmap.getAiRoadmapId());
-        } else if (!aiRoadmapItemRepository
-                .findAllByAiRoadmap_AiRoadmapIdOrderByStandardItem_TargetGradeAscStandardItem_DisplayOrderAsc(roadmap.getAiRoadmapId())
-                .isEmpty()) {
-            return toRoadmapResponse(member, roadmap, null, null);
-        }
-
+    private void createRequiredItems(String userId, AiRoadmap roadmap, List<AiRoadmapStandardItem> standards) {
         String corpus = profileAnalyzer.buildProfileCorpus(userId);
         List<AiRoadmapItem> items = standards.stream()
                 .filter(AiRoadmapStandardItem::isRequiredItem)
                 .map(standard -> AiRoadmapItem.create(roadmap, standard, resolveStatus(standard, corpus), false))
                 .toList();
         aiRoadmapItemRepository.saveAll(items);
-        return toRoadmapResponse(member, roadmap, null, null);
     }
 
     public AiRoadmapDto.RoadmapResponse getMyRoadmap(String userId, Integer grade,
