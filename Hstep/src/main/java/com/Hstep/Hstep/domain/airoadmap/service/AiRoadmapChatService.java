@@ -26,6 +26,7 @@ public class AiRoadmapChatService {
     private final AiRoadmapIntentClassifier intentClassifier;
     private final AiRoadmapChangeProposalRepository proposalRepository;
 
+    @Transactional
     public AiRoadmapDto.ChatResponse chat(String userId, AiRoadmapDto.ChatRequest request) {
         aiRoadmapService.requireEligible(userId);
         AiRoadmap roadmap = aiRoadmapService.findRoadmap(userId);
