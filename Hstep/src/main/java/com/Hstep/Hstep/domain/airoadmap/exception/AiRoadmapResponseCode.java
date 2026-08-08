@@ -14,6 +14,7 @@ public enum AiRoadmapResponseCode implements BaseResponseCode {
     TRACK_REQUIRED("AI_ROADMAP_400_1", BAD_REQUEST, "소속 트랙 정보가 필요합니다."),
     UNSUPPORTED_ACTION("AI_ROADMAP_400_2", BAD_REQUEST, "현재 지원하지 않는 AI 로드맵 요청입니다."),
     INVALID_PROPOSAL_STATE("AI_ROADMAP_409_1", CONFLICT, "이미 처리된 변경 제안입니다."),
+    AI_ROADMAP_ALREADY_EXISTS("AI_ROADMAP_409_2", CONFLICT, "개인 AI 로드맵이 이미 생성되어 있습니다. 관심 직무 변경은 변경 제안을 통해 진행해주세요."),
     AI_ROADMAP_NOT_FOUND("AI_ROADMAP_404_1", NOT_FOUND, "생성된 개인 AI 로드맵이 없습니다."),
     AI_ROADMAP_ITEM_NOT_FOUND("AI_ROADMAP_404_2", NOT_FOUND, "개인 로드맵 항목을 찾을 수 없습니다."),
     STANDARD_ITEM_NOT_FOUND("AI_ROADMAP_404_3", NOT_FOUND, "직무별 표준 로드맵 항목을 찾을 수 없습니다."),
