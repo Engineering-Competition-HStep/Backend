@@ -2,10 +2,11 @@ package com.Hstep.Hstep.domain.chat.dto;
 
 import com.Hstep.Hstep.domain.chat.entity.ChatMessage;
 import com.Hstep.Hstep.domain.chat.entity.ChatRole;
-
 import java.time.LocalDateTime;
 
 public class ChatMessageDto {
+
+    public record Request(String content) {}
 
     public record Response(
             Long chatId,
