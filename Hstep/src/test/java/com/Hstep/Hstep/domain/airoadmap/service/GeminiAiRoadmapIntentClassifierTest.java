@@ -2,9 +2,9 @@ package com.Hstep.Hstep.domain.airoadmap.service;
 
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapChangeProposal;
 import com.Hstep.Hstep.global.exception.BaseException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -16,7 +16,7 @@ class GeminiAiRoadmapIntentClassifierTest {
 
     private final ChatModel chatModel = mock(ChatModel.class);
     private final GeminiAiRoadmapIntentClassifier classifier =
-            new GeminiAiRoadmapIntentClassifier(chatModel, new ObjectMapper());
+            new GeminiAiRoadmapIntentClassifier(chatModel, JsonMapper.builder().build());
 
     @Test
     void Gemini응답을_관심직무변경_요청으로_분류한다() {
@@ -41,6 +41,13 @@ class GeminiAiRoadmapIntentClassifierTest {
     @Test
     void Gemini응답이_잘못되면_BaseException을_발생시킨다() {
         when(chatModel.call(anyString())).thenReturn("invalid response");
+
+        assertThrows(BaseException.class, () -> classifier.classify("프로젝트 추천해줘"));
+    }
+
+    @Test
+    void Gemini응답의_actionType이_비어있으면_BaseException을_발생시킨다() {
+        when(chatModel.call(anyString())).thenReturn("{\"actionType\":\"\"}");
 
         assertThrows(BaseException.class, () -> classifier.classify("프로젝트 추천해줘"));
     }
