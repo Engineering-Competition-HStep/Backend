@@ -54,7 +54,7 @@ public class AiRoadmapChatService {
             return new AiRoadmapDto.ChatResponse(
                     "변경 가능한 추천 직무를 선택해주세요. 직무를 선택해도 확인 전에는 로드맵이 변경되지 않습니다.",
                     AiRoadmapChangeProposal.ActionType.CHANGE_INTEREST_JOB,
-                    false, null, options, null
+                    false, null, options, null, null
             );
         }
 
@@ -67,14 +67,55 @@ public class AiRoadmapChatService {
             throw new BaseException(AiRoadmapResponseCode.STANDARD_ROADMAP_NOT_FOUND);
         }
 
+        AiRoadmapDto.RoadmapDiffResponse diff = calculateJobDiff(roadmap, selected.jobId());
         String message = "관심 직무를 '" + roadmap.getInterestJob().getJobName() + "'에서 '"
-                + selected.jobName() + "'(으)로 변경하고 표준 로드맵을 다시 구성합니다. "
-                + "두 직무에 공통으로 존재하는 완료 항목은 완료 상태를 유지합니다.";
+                + selected.jobName() + "'(으)로 변경합니다. 유지 " + diff.maintainedItems().size()
+                + "개, 추가 " + diff.addedItems().size() + "개, 제외 " + diff.removedItems().size()
+                + "개 항목이 있습니다. 공통 완료 항목은 완료 상태를 유지합니다.";
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
                 AiRoadmapChangeProposal.ActionType.CHANGE_INTEREST_JOB,
                 null, null, selected.jobId(), null, message);
 
-        return responseWithProposal(message, proposal, options, null);
+        return responseWithProposal(message, proposal, options, null, diff);
+    }
+
+    private AiRoadmapDto.RoadmapDiffResponse calculateJobDiff(AiRoadmap roadmap, Long targetJobId) {
+        List<AiRoadmapItem> currentItems = aiRoadmapService.getAllItems(roadmap).stream()
+                .filter(item -> item.getStatus() != AiRoadmapItem.Status.HIDDEN)
+                .toList();
+        List<AiRoadmapStandardItem> targetItems = aiRoadmapService.standardRepository()
+                .findAllByJob_JobIdOrderByTargetGradeAscDisplayOrderAsc(targetJobId).stream()
+                .filter(AiRoadmapStandardItem::isRequiredItem)
+                .toList();
+
+        Map<String, String> currentByKey = currentItems.stream()
+                .collect(Collectors.toMap(
+                        item -> completionKey(item.getStandardItem()),
+                        item -> item.getStandardItem().getTitle(),
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+        Map<String, String> targetByKey = targetItems.stream()
+                .collect(Collectors.toMap(
+                        this::completionKey,
+                        AiRoadmapStandardItem::getTitle,
+                        (first, ignored) -> first,
+                        LinkedHashMap::new
+                ));
+
+        List<String> maintained = currentByKey.entrySet().stream()
+                .filter(entry -> targetByKey.containsKey(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        List<String> added = targetByKey.entrySet().stream()
+                .filter(entry -> !currentByKey.containsKey(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        List<String> removed = currentByKey.entrySet().stream()
+                .filter(entry -> !targetByKey.containsKey(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
+        return new AiRoadmapDto.RoadmapDiffResponse(maintained, added, removed);
     }
 
     private AiRoadmapDto.ChatResponse proposeItemAddition(String userId, AiRoadmap roadmap,
@@ -115,7 +156,7 @@ public class AiRoadmapChatService {
         if (candidate.isEmpty()) {
             return new AiRoadmapDto.ChatResponse(
                     "현재 기준 데이터에서 추가할 수 있는 " + categoryName(category) + " 항목이 없습니다. 기존 로드맵을 유지합니다.",
-                    AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null
+                    AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null, null
             );
         }
 
@@ -127,7 +168,7 @@ public class AiRoadmapChatService {
                 AiRoadmapChangeProposal.ActionType.ADD_ROADMAP_ITEM,
                 null, standard.getStandardItemId(), null, standard.getPriority(), message);
 
-        return responseWithProposal(message, proposal, List.of(), null);
+        return responseWithProposal(message, proposal, List.of(), null, null);
     }
 
     private AiRoadmapDto.ChatResponse proposeItemChange(String userId, AiRoadmap roadmap,
@@ -140,7 +181,7 @@ public class AiRoadmapChatService {
                 + "합니다. 확인 후에만 실제 로드맵에 반영됩니다.";
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap, actionType,
                 item.getAiRoadmapItemId(), null, null, null, message);
-        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item));
+        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
     private AiRoadmapDto.ChatResponse proposePriorityChange(String userId, AiRoadmap roadmap,
@@ -152,7 +193,7 @@ public class AiRoadmapChatService {
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
                 AiRoadmapChangeProposal.ActionType.CHANGE_PRIORITY,
                 item.getAiRoadmapItemId(), null, null, priority, message);
-        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item));
+        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
     private AiRoadmapDto.ChatResponse explainItem(AiRoadmap roadmap, AiRoadmapDto.ChatRequest request) {
@@ -164,7 +205,7 @@ public class AiRoadmapChatService {
                 + reasonSuffix(standard.getRecommendationReason());
         return new AiRoadmapDto.ChatResponse(message,
                 AiRoadmapChangeProposal.ActionType.EXPLAIN_ROADMAP_ITEM,
-                false, null, List.of(), AiRoadmapDto.ItemResponse.from(item));
+                false, null, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
     private AiRoadmapDto.ChatResponse guidePriorityOrSupportedRequest(AiRoadmap roadmap,
@@ -186,10 +227,10 @@ public class AiRoadmapChatService {
                 String message = "현재 가장 먼저 준비할 활동은 '" + item.getStandardItem().getTitle()
                         + "'입니다." + reasonSuffix(item.getStandardItem().getRecommendationReason());
                 return new AiRoadmapDto.ChatResponse(message, AiRoadmapChangeProposal.ActionType.NO_ACTION,
-                        false, null, List.of(), AiRoadmapDto.ItemResponse.from(item));
+                        false, null, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
             }
             return new AiRoadmapDto.ChatResponse("현재 학년에 남아 있는 미완료 로드맵 항목이 없습니다.",
-                    AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null);
+                    AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null, null);
         }
         return unsupportedGuide();
     }
@@ -197,7 +238,7 @@ public class AiRoadmapChatService {
     private AiRoadmapDto.ChatResponse unsupportedGuide() {
         return new AiRoadmapDto.ChatResponse(
                 "현재는 프로젝트·자격증 추천 및 추가, 우선 활동 안내, 활동 완료·제외, 활동 설명, 우선순위 변경, 관심 직무 변경을 지원합니다.",
-                AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null
+                AiRoadmapChangeProposal.ActionType.NO_ACTION, false, null, List.of(), null, null
         );
     }
 
@@ -298,9 +339,10 @@ public class AiRoadmapChatService {
 
     private AiRoadmapDto.ChatResponse responseWithProposal(String message, AiRoadmapChangeProposal proposal,
                                                             List<AiRoadmapDto.JobRecommendationResponse> jobOptions,
-                                                            AiRoadmapDto.ItemResponse item) {
+                                                            AiRoadmapDto.ItemResponse item,
+                                                            AiRoadmapDto.RoadmapDiffResponse diff) {
         return new AiRoadmapDto.ChatResponse(message, proposal.getActionType(), true,
-                AiRoadmapDto.ProposalResponse.from(proposal), jobOptions, item);
+                AiRoadmapDto.ProposalResponse.from(proposal), jobOptions, item, diff);
     }
 
     private AiRoadmapStandardItem.Category resolveRequestedCategory(String message,
