@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class AiRoadmapDto {
@@ -63,7 +64,8 @@ public class AiRoadmapDto {
             String recommendationReason,
             String description,
             String externalUrl,
-            boolean aiApplied
+            boolean aiApplied,
+            LocalDateTime updatedAt
     ) {
         public static ItemResponse from(AiRoadmapItem item) {
             AiRoadmapStandardItem standard = item.getStandardItem();
@@ -71,7 +73,7 @@ public class AiRoadmapDto {
                     item.getAiRoadmapItemId(), standard.getStandardItemId(), standard.getTitle(),
                     standard.getCategory(), standard.getTargetGrade(), item.getPriority(), item.getStatus(),
                     standard.getDisplayOrder(), standard.getRecommendationReason(), standard.getDescription(),
-                    standard.getExternalUrl(), item.isAiApplied()
+                    standard.getExternalUrl(), item.isAiApplied(), item.getUpdatedAt()
             );
         }
     }
@@ -90,7 +92,14 @@ public class AiRoadmapDto {
             boolean requiresConfirmation,
             ProposalResponse proposal,
             List<JobRecommendationResponse> jobOptions,
-            ItemResponse referencedItem
+            ItemResponse referencedItem,
+            RoadmapDiffResponse roadmapDiff
+    ) {}
+
+    public record RoadmapDiffResponse(
+            List<String> maintainedItems,
+            List<String> addedItems,
+            List<String> removedItems
     ) {}
 
     public record ProposalResponse(
