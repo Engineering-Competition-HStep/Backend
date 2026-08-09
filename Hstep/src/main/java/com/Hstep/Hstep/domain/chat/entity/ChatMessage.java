@@ -22,7 +22,7 @@ public class ChatMessage extends BaseEntity {
     private ChatRole role;
 
     @Lob
-    @Column(name = "content", nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
