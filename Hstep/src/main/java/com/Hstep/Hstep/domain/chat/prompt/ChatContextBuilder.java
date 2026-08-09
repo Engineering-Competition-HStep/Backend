@@ -24,6 +24,8 @@ public class ChatContextBuilder {
 
                 [트랙 기준 추천 로드맵]
                 %s
+
+                위 정보를 참고해서 답변해줘.
                 """.formatted(
                 track1, track2 != null ? track2 : "없음",
                 grade, overallGpa != null ? overallGpa : "미입력",
