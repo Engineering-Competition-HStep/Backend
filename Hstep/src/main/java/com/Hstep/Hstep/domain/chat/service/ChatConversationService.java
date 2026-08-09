@@ -12,10 +12,18 @@ import com.Hstep.Hstep.domain.chat.prompt.ChatSystemPrompts;
 import com.Hstep.Hstep.domain.chat.repository.ChatMessageRepository;
 import com.Hstep.Hstep.domain.chat.repository.ChatRoomRepository;
 import com.Hstep.Hstep.domain.member.entity.Member;
+import com.Hstep.Hstep.domain.member.entity.MemberTrack;
+import com.Hstep.Hstep.domain.member.exception.MemberResponseCode;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.domain.profile.dto.ProfileCompletenessDto;
 import com.Hstep.Hstep.domain.profile.repository.*;
 import com.Hstep.Hstep.domain.profile.service.ProfileCompletenessService;
+import com.Hstep.Hstep.domain.roadmap.entity.BaseRoadmap;
+import com.Hstep.Hstep.domain.roadmap.entity.BaseRoadmapItem;
+import com.Hstep.Hstep.domain.roadmap.entity.RoadmapLevel;
+import com.Hstep.Hstep.domain.roadmap.repository.BaseRoadmapRepository;
+import com.Hstep.Hstep.domain.track.entity.Track;
+import com.Hstep.Hstep.domain.track.repository.TrackRepository;
 import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
@@ -27,6 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -45,7 +54,8 @@ public class ChatConversationService {
     private final ExtraActivityRepository extraActivityRepository;
     private final UserGradeGpaRepository userGradeGpaRepository;
 
-    // TODO: Track / BaseRoadmapItem 레포지토리 - 아래 buildContextBlock() 완성에 필요
+    private final TrackRepository trackRepository;
+    private final BaseRoadmapRepository baseRoadmapRepository;
 
     private final ChatClient chatClient;
 
@@ -114,6 +124,19 @@ public class ChatConversationService {
     }
 
     private String buildContextBlock(String userId) {
+        Member member = memberRepository.findWithTracksByUserId(userId)
+                .orElseThrow(() -> new BaseException(MemberResponseCode.MEMBER_NOT_FOUND));
+
+        List<MemberTrack> tracks = member.getMemberTracks().stream()
+                .sorted(Comparator.comparing(MemberTrack::getTrackOrder))
+                .toList();
+
+        String track1 = trackName(tracks, 0);
+        String track2 = tracks.size() > 1 ? trackName(tracks, 1) : null;
+
+        Integer grade = member.getGrade();
+        String gpa = member.getGpa() != null ? member.getGpa().toString() : "미입력";
+
         String certificates = formatOrNone(certificateRepository.findByMember_UserId(userId).stream()
                 .map(c -> c.getCertificateName() + "(" + c.getIssuedYear() + ")").toList());
         String awards = formatOrNone(awardRepository.findByMember_UserId(userId).stream()
@@ -123,12 +146,55 @@ public class ChatConversationService {
         String activities = formatOrNone(extraActivityRepository.findByMember_UserId(userId).stream()
                 .map(e -> e.getActivityName()).toList());
 
-        // TODO: 트랙명(1/2트랙), 평균학점, 트랙 기준 추천 로드맵은
-        // Track/MemberTrack/BaseRoadmapItem 조회 로직 완성 후 채워야 함
+        String roadmapTemplate = buildRoadmapTemplate(tracks);
+
         return ChatContextBuilder.build(
-                "TODO", "TODO", 0, "TODO",
-                certificates, awards, volunteers, activities, "TODO"
+                track1, track2, grade, gpa,
+                certificates, awards, volunteers, activities,
+                roadmapTemplate
         );
+    }
+
+    private String trackName(List<MemberTrack> tracks, int index) {
+        Long trackId = tracks.get(index).getTrackId();
+        return trackRepository.findById(trackId)
+                .map(Track::getTrackName)
+                .orElse("알수없음");
+    }
+
+    private String buildRoadmapTemplate(List<MemberTrack> tracks) {
+        StringBuilder sb = new StringBuilder();
+
+        for (MemberTrack memberTrack : tracks) {
+            Track track = trackRepository.findById(memberTrack.getTrackId()).orElse(null);
+            if (track == null) continue;
+
+            BaseRoadmap roadmap = baseRoadmapRepository.findByTrack_TrackId(track.getTrackId()).orElse(null);
+            if (roadmap == null || roadmap.getItems().isEmpty()) continue;
+
+            sb.append("[").append(track.getTrackName()).append("]\n");
+
+            roadmap.getItems().stream()
+                    .sorted(Comparator.comparing(BaseRoadmapItem::getGrade)
+                            .thenComparing(BaseRoadmapItem::getSemester)
+                            .thenComparing(BaseRoadmapItem::getItemOrder))
+                    .forEach(item -> sb.append(String.format(
+                            "- %d학년 %d학기 | %s | [%s] %s%n",
+                            item.getGrade(), item.getSemester(),
+                            levelLabel(item.getLevel()), item.getCategory(), item.getTitle()
+                    )));
+        }
+
+        return sb.length() == 0 ? "해당 트랙의 추천 로드맵 데이터가 아직 등록되지 않았습니다." : sb.toString();
+    }
+
+    private String levelLabel(RoadmapLevel level) {
+        return switch (level) {
+            case BASIC -> "기초";
+            case CORE -> "핵심";
+            case ADVANCED -> "심화";
+            case APPLIED -> "활용";
+        };
     }
 
     private String formatOrNone(List<String> items) {
