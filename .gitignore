@@ -1,0 +1,7 @@
+.metadata/.lock
+.metadata/
+
+# 로컬 비밀정보 (DB 접속정보, JWT 시크릿, API 키 등)
+.env
+.env.properties
+Hstep/src/main/resources/application.yml
