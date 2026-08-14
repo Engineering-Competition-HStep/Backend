@@ -100,8 +100,15 @@ public class Member extends BaseEntity {
     }
 
     public void replaceTracks(List<Long> trackIds) {
-        memberTracks.clear();
+        clearTracks();
+        addTracks(trackIds);
+    }
 
+    public void clearTracks() {
+        memberTracks.clear();
+    }
+
+    public void addTracks(List<Long> trackIds) {
         for (int index = 0; index < trackIds.size(); index++) {
             memberTracks.add(MemberTrack.create(this, trackIds.get(index), index + 1));
         }

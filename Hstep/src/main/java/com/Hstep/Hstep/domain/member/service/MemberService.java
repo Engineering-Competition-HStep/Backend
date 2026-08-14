@@ -31,7 +31,9 @@ public class MemberService {
 
         if (updateReq.getTrackIds() != null) {
             validateTracks(updateReq.getTrackIds());
-            member.replaceTracks(updateReq.getTrackIds());
+            member.clearTracks();
+            memberRepository.flush();
+            member.addTracks(updateReq.getTrackIds());
         }
 
         return MemberRes.fromEntity(member);
