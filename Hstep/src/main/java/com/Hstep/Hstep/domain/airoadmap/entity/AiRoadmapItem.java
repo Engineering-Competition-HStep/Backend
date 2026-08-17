@@ -59,6 +59,11 @@ public class AiRoadmapItem extends BaseEntity {
         this.aiApplied = aiApplied;
     }
 
+    // 완료 체크를 잘못 눌렀거나 취소하고 싶을 때 이전 상태로 롤백
+    public void reopen() {
+        this.status = Status.PENDING;
+    }
+
     public void hide() {
         this.status = Status.HIDDEN;
         this.aiApplied = true;

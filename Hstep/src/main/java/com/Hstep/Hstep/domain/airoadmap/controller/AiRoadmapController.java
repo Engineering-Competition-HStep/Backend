@@ -85,6 +85,17 @@ public class AiRoadmapController {
         );
     }
 
+    @PatchMapping("/items/{roadmapItemId}/reopen")
+    public SuccessResponse<AiRoadmapDto.ItemResponse> reopenItem(
+            @AuthenticationPrincipal MemberPrincipal principal,
+            @PathVariable Long roadmapItemId
+    ) {
+        return SuccessResponse.of(
+                aiRoadmapService.reopenItem(principal.getUserId(), roadmapItemId),
+                AiRoadmapResponseCode.ROADMAP_ITEM_UPDATE_SUCCESS
+        );
+    }
+
     @PostMapping("/chat")
     public SuccessResponse<AiRoadmapDto.ChatResponse> chat(
             @AuthenticationPrincipal MemberPrincipal principal,

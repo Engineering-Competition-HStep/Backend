@@ -187,6 +187,14 @@ public class AiRoadmapService {
         return AiRoadmapDto.ItemResponse.from(item);
     }
 
+    @Transactional
+    public AiRoadmapDto.ItemResponse reopenItem(String userId, Long roadmapItemId) {
+        AiRoadmap roadmap = findRoadmap(userId);
+        AiRoadmapItem item = findOwnedItem(roadmap, roadmapItemId);
+        item.reopen();
+        return AiRoadmapDto.ItemResponse.from(item);
+    }
+
     private AiRoadmapItem.Status resolveStatus(AiRoadmapStandardItem standard, String corpus) {
         double ratio = matchRatio(standard, corpus);
         if (ratio >= 0.5) return AiRoadmapItem.Status.COMPLETED;
