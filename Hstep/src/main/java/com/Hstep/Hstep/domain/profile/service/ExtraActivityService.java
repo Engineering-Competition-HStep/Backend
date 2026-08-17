@@ -35,17 +35,19 @@ public class ExtraActivityService {
     }
 
     @Transactional
-    public void update(Long activityId, ExtraActivityDto.Request request) {
-        ExtraActivity activity = extraActivityRepository.findById(activityId)
-                .orElseThrow(() -> new BaseException(ProfileResponseCode.EXTRA_ACTIVITY_NOT_FOUND));
+    public void update(String userId, Long activityId, ExtraActivityDto.Request request) {
+        ExtraActivity activity = getOwnedActivity(userId, activityId);
         activity.update(request.activityName(), request.fieldKeyword(), request.period(), request.description());
     }
 
     @Transactional
-    public void delete(Long activityId) {
-        if (!extraActivityRepository.existsById(activityId)) {
-            throw new BaseException(ProfileResponseCode.EXTRA_ACTIVITY_NOT_FOUND);
-        }
-        extraActivityRepository.deleteById(activityId);
+    public void delete(String userId, Long activityId) {
+        ExtraActivity activity = getOwnedActivity(userId, activityId);
+        extraActivityRepository.delete(activity);
+    }
+
+    private ExtraActivity getOwnedActivity(String userId, Long activityId) {
+        return extraActivityRepository.findByActivityIdAndMember_UserId(activityId, userId)
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.EXTRA_ACTIVITY_NOT_FOUND));
     }
 }

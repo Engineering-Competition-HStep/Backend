@@ -23,7 +23,13 @@ public class VolunteerService {
     @Transactional
     public Long create(String userId, VolunteerDto.Request request) {
         Member member = memberRepository.getReferenceById(userId);
-        Volunteer volunteer = new Volunteer(request.volunteerName(), request.volunteerHours(), request.description(), member);
+        Volunteer volunteer = new Volunteer(
+                request.volunteerName(),
+                request.organizationName(),
+                request.volunteerHours(),
+                request.description(),
+                member
+        );
         return volunteerRepository.save(volunteer).getVolunteerId();
     }
 
@@ -34,17 +40,24 @@ public class VolunteerService {
     }
 
     @Transactional
-    public void update(Long volunteerId, VolunteerDto.Request request) {
-        Volunteer volunteer = volunteerRepository.findById(volunteerId)
-                .orElseThrow(() -> new BaseException(ProfileResponseCode.VOLUNTEER_NOT_FOUND));
-        volunteer.update(request.volunteerName(), request.volunteerHours(), request.description());
+    public void update(String userId, Long volunteerId, VolunteerDto.Request request) {
+        Volunteer volunteer = getOwnedVolunteer(userId, volunteerId);
+        volunteer.update(
+                request.volunteerName(),
+                request.organizationName(),
+                request.volunteerHours(),
+                request.description()
+        );
     }
 
     @Transactional
-    public void delete(Long volunteerId) {
-        if (!volunteerRepository.existsById(volunteerId)) {
-            throw new BaseException(ProfileResponseCode.VOLUNTEER_NOT_FOUND);
-        }
-        volunteerRepository.deleteById(volunteerId);
+    public void delete(String userId, Long volunteerId) {
+        Volunteer volunteer = getOwnedVolunteer(userId, volunteerId);
+        volunteerRepository.delete(volunteer);
+    }
+
+    private Volunteer getOwnedVolunteer(String userId, Long volunteerId) {
+        return volunteerRepository.findByVolunteerIdAndMember_UserId(volunteerId, userId)
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.VOLUNTEER_NOT_FOUND));
     }
 }

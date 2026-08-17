@@ -34,17 +34,19 @@ public class CertificateService {
     }
 
     @Transactional
-    public void update(Long certificateId, CertificateDto.Request request) {
-        Certificate certificate = certificateRepository.findById(certificateId)
-                .orElseThrow(() -> new BaseException(ProfileResponseCode.CERTIFICATE_NOT_FOUND));
+    public void update(String userId, Long certificateId, CertificateDto.Request request) {
+        Certificate certificate = getOwnedCertificate(userId, certificateId);
         certificate.update(request.certificateName(), request.issuedYear());
     }
 
     @Transactional
-    public void delete(Long certificateId) {
-        if (!certificateRepository.existsById(certificateId)) {
-            throw new BaseException(ProfileResponseCode.CERTIFICATE_NOT_FOUND);
-        }
-        certificateRepository.deleteById(certificateId);
+    public void delete(String userId, Long certificateId) {
+        Certificate certificate = getOwnedCertificate(userId, certificateId);
+        certificateRepository.delete(certificate);
+    }
+
+    private Certificate getOwnedCertificate(String userId, Long certificateId) {
+        return certificateRepository.findByCertificateIdAndMember_UserId(certificateId, userId)
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.CERTIFICATE_NOT_FOUND));
     }
 }

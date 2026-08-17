@@ -34,17 +34,19 @@ public class AwardService {
     }
 
     @Transactional
-    public void update(Long awardId, AwardDto.Request request) {
-        Award award = awardRepository.findById(awardId)
-                .orElseThrow(() -> new BaseException(ProfileResponseCode.AWARD_NOT_FOUND));
+    public void update(String userId, Long awardId, AwardDto.Request request) {
+        Award award = getOwnedAward(userId, awardId);
         award.update(request.competitionName(), request.awardName(), request.awardRank(), request.description());
     }
 
     @Transactional
-    public void delete(Long awardId) {
-        if (!awardRepository.existsById(awardId)) {
-            throw new BaseException(ProfileResponseCode.AWARD_NOT_FOUND);
-        }
-        awardRepository.deleteById(awardId);
+    public void delete(String userId, Long awardId) {
+        Award award = getOwnedAward(userId, awardId);
+        awardRepository.delete(award);
+    }
+
+    private Award getOwnedAward(String userId, Long awardId) {
+        return awardRepository.findByAwardIdAndMember_UserId(awardId, userId)
+                .orElseThrow(() -> new BaseException(ProfileResponseCode.AWARD_NOT_FOUND));
     }
 }

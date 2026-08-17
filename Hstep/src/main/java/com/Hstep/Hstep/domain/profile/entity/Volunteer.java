@@ -21,6 +21,9 @@ public class Volunteer extends BaseEntity {
     @Column(name = "volunteer_name", nullable = false, length = 100)
     private String volunteerName;
 
+    @Column(name = "organization_name", length = 100)
+    private String organizationName;
+
     @Column(name = "volunteer_hours", nullable = false)
     private Integer volunteerHours;
 
@@ -31,15 +34,17 @@ public class Volunteer extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private Member member;
 
-    public Volunteer(String volunteerName, Integer volunteerHours, String description, Member member) {
+    public Volunteer(String volunteerName, String organizationName, Integer volunteerHours, String description, Member member) {
         this.volunteerName = volunteerName;
+        this.organizationName = organizationName;
         this.volunteerHours = volunteerHours;
         this.description = description;
         this.member = member;
     }
 
-    public void update(String volunteerName, Integer volunteerHours, String description) {
+    public void update(String volunteerName, String organizationName, Integer volunteerHours, String description) {
         this.volunteerName = volunteerName;
+        this.organizationName = organizationName;
         this.volunteerHours = volunteerHours;
         this.description = description;
     }
