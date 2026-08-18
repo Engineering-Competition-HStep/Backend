@@ -12,7 +12,7 @@ public class RuleBasedAiRoadmapIntentClassifier implements AiRoadmapIntentClassi
     public AiRoadmapChangeProposal.ActionType classify(String message) {
         String normalized = message == null ? "" : message.toLowerCase(Locale.ROOT).replace(" ", "");
 
-        if (containsAny(normalized, "관심직무변경", "직무변경", "진로변경", "다른직무")) {
+        if (containsAny(normalized, "관심직무변경", "관심직무를변경", "직무변경", "직무를변경", "진로변경", "진로를변경", "다른직무")) {
             return AiRoadmapChangeProposal.ActionType.CHANGE_INTEREST_JOB;
         }
         if (containsAny(normalized, "완료", "끝냈", "취득했", "했어", "마쳤")) {
