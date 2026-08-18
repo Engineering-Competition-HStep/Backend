@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,10 +47,9 @@ public class AiRoadmapStandardItemDataInitializer {
      *
      * <p>동작 원칙:</p>
      * <ul>
-     *     <li>직무별 seedKey가 이미 존재하면 그대로 유지합니다.</li>
-     *     <li>과거에 동일 제목·학년·카테고리로 수동 삽입한 행은 중복 생성하지 않고 seedKey만 부여합니다.</li>
-     *     <li>누락된 항목만 추가하며, 기존 관리자가 수정한 표준 항목의 내용은 덮어쓰지 않습니다.</li>
-     *     <li>관리자 API로 직접 등록한 seedKey가 없는 항목도 삭제하지 않습니다.</li>
+     *     <li>자동 시드는 templateVersion이 낮을 때만 최신 정의로 갱신합니다.</li>
+     *     <li>누락된 자동 시드만 추가합니다.</li>
+     *     <li>관리자 API로 직접 등록한 seedKey가 없는 항목은 수정하거나 삭제하지 않습니다.</li>
      * </ul>
      */
     @Order(300)
@@ -70,18 +68,11 @@ public class AiRoadmapStandardItemDataInitializer {
 
         Map<SeedIdentity, AiRoadmapStandardItem> itemBySeedIdentity =
                 new HashMap<>();
-        Map<NaturalIdentity, AiRoadmapStandardItem> itemByNaturalIdentity =
-                new LinkedHashMap<>();
-
         int manualItemCount = 0;
 
         for (AiRoadmapStandardItem item : currentItems) {
+            item.backfillLegacyMetadata();
             Long jobId = item.getJob().getJobId();
-
-            itemByNaturalIdentity.putIfAbsent(
-                    NaturalIdentity.of(jobId, item),
-                    item
-            );
 
             if (item.getSeedKey() == null || item.getSeedKey().isBlank()) {
                 manualItemCount++;
@@ -105,10 +96,11 @@ public class AiRoadmapStandardItemDataInitializer {
             }
         }
 
-        int expectedTemplateCount =
-                jobs.size() * AiRoadmapStandardSeedCatalog.ITEMS_PER_JOB;
+        int expectedTemplateCount = jobs.stream()
+                .mapToInt(job -> AiRoadmapStandardSeedCatalog.createFor(job).size())
+                .sum();
         int alreadySeededCount = 0;
-        int claimedLegacyCount = 0;
+        int updatedSeededCount = 0;
         int createdCount = 0;
 
         List<AiRoadmapStandardItem> missingItems =
@@ -125,24 +117,18 @@ public class AiRoadmapStandardItemDataInitializer {
                 SeedIdentity seedIdentity =
                         new SeedIdentity(job.getJobId(), seed.seedKey());
 
-                if (itemBySeedIdentity.containsKey(seedIdentity)) {
+                AiRoadmapStandardItem seededItem = itemBySeedIdentity.get(seedIdentity);
+                if (seededItem != null) {
+                    if (seededItem.getTemplateVersion() == null
+                            || seededItem.getTemplateVersion() < seed.templateVersion()) {
+                        seededItem.synchronizeTemplate(seed.category(), seed.targetGrade(), seed.priority(),
+                                seed.displayOrder(), seed.title(), seed.description(), seed.keyword(),
+                                seed.recommendationReason(), seed.externalUrl(), seed.requiredItem(),
+                                seed.roadmapLane(), seed.itemType(), seed.targetStage(), seed.coreItem(),
+                                seed.defaultIncluded(), seed.templateVersion());
+                        updatedSeededCount++;
+                    }
                     alreadySeededCount++;
-                    continue;
-                }
-
-                NaturalIdentity naturalIdentity =
-                        NaturalIdentity.of(job.getJobId(), seed);
-
-                AiRoadmapStandardItem legacyItem =
-                        itemByNaturalIdentity.get(naturalIdentity);
-
-                if (legacyItem != null
-                        && (legacyItem.getSeedKey() == null
-                        || legacyItem.getSeedKey().isBlank())) {
-                    legacyItem.assignSeedKeyIfAbsent(seed.seedKey());
-                    itemBySeedIdentity.put(seedIdentity, legacyItem);
-                    claimedLegacyCount++;
-                    manualItemCount--;
                     continue;
                 }
 
@@ -159,12 +145,17 @@ public class AiRoadmapStandardItemDataInitializer {
                                 seed.keyword(),
                                 seed.recommendationReason(),
                                 seed.externalUrl(),
-                                seed.requiredItem()
+                                seed.requiredItem(),
+                                seed.roadmapLane(),
+                                seed.itemType(),
+                                seed.targetStage(),
+                                seed.coreItem(),
+                                seed.defaultIncluded(),
+                                seed.templateVersion()
                         );
 
                 missingItems.add(missingItem);
                 itemBySeedIdentity.put(seedIdentity, missingItem);
-                itemByNaturalIdentity.put(naturalIdentity, missingItem);
             }
         }
 
@@ -178,19 +169,17 @@ public class AiRoadmapStandardItemDataInitializer {
             createdCount += batch.size();
         }
 
-        // 기존 수동 행에 seedKey만 부여한 경우에도 변경 사항을 즉시 DB에 반영합니다.
-        if (claimedLegacyCount > 0 && missingItems.isEmpty()) {
+        if (updatedSeededCount > 0 && missingItems.isEmpty()) {
             standardItemRepository.flush();
         }
 
         log.info(
-                "AI 표준 로드맵 동기화 완료. jobs={}, templatesPerJob={}, expectedTemplates={}, "
-                        + "alreadySeeded={}, claimedLegacy={}, created={}, preservedManualItems={}, totalRowsAfterSync={}",
+                "AI 표준 로드맵 동기화 완료. jobs={}, expectedTemplates={}, "
+                        + "alreadySeeded={}, updatedSeeded={}, created={}, preservedManualItems={}, totalRowsAfterSync={}",
                 jobs.size(),
-                AiRoadmapStandardSeedCatalog.ITEMS_PER_JOB,
                 expectedTemplateCount,
                 alreadySeededCount,
-                claimedLegacyCount,
+                updatedSeededCount,
                 createdCount,
                 Math.max(0, manualItemCount),
                 currentItems.size() + createdCount
@@ -200,34 +189,4 @@ public class AiRoadmapStandardItemDataInitializer {
     private record SeedIdentity(Long jobId, String seedKey) {
     }
 
-    private record NaturalIdentity(
-            Long jobId,
-            AiRoadmapStandardItem.Category category,
-            Integer targetGrade,
-            String title
-    ) {
-        private static NaturalIdentity of(
-                Long jobId,
-                AiRoadmapStandardItem item
-        ) {
-            return new NaturalIdentity(
-                    jobId,
-                    item.getCategory(),
-                    item.getTargetGrade(),
-                    item.getTitle()
-            );
-        }
-
-        private static NaturalIdentity of(
-                Long jobId,
-                StandardItemSeed seed
-        ) {
-            return new NaturalIdentity(
-                    jobId,
-                    seed.category(),
-                    seed.targetGrade(),
-                    seed.title()
-            );
-        }
-    }
 }

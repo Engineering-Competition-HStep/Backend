@@ -1,6 +1,9 @@
 package com.Hstep.Hstep.domain.airoadmap.initializer;
 
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapStandardItem;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapItemType;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapLane;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapStage;
 import com.Hstep.Hstep.domain.job.entity.Job;
 import com.Hstep.Hstep.domain.job.entity.JobCategory;
 
@@ -11,7 +14,7 @@ import java.util.stream.Collectors;
 
 public final class AiRoadmapStandardSeedCatalog {
 
-    public static final int ITEMS_PER_JOB = 12;
+    public static final int TEMPLATE_VERSION = 2;
 
     private static final int TITLE_MAX_LENGTH = 120;
     private static final int DESCRIPTION_MAX_LENGTH = 1000;
@@ -33,7 +36,18 @@ public final class AiRoadmapStandardSeedCatalog {
         Objects.requireNonNull(category, "직무 카테고리는 필수입니다.");
 
         String normalizedJobName = jobName.trim();
+        if (category == JobCategory.SOFTWARE) {
+            return createSoftwareProfile(normalizedJobName);
+        }
         DomainProfile profile = profileOf(category);
+        String foundation = firstClause(profile.foundation());
+        String tools = firstClause(profile.tools());
+        String practice = firstClause(profile.practice());
+        String project = firstClause(profile.projectTheme());
+        String credential = firstClause(profile.credentialGuide());
+        String fieldExperience = firstClause(profile.fieldExperience());
+        String portfolio = firstClause(profile.portfolioEvidence());
+        String interview = firstClause(profile.interviewFocus());
 
         return List.of(
                 seed(
@@ -42,7 +56,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         2,
                         AiRoadmapStandardItem.Priority.HIGH,
                         10,
-                        normalizedJobName + " 기초 역량 학습",
+                        foundation + "와 " + tools + " 실습",
                         normalizedJobName + " 직무에 필요한 " + profile.foundation()
                                 + "를 학습하고, " + profile.tools() + "을 활용하는 기초 실습을 진행합니다.",
                         keywords(normalizedJobName, category.getDisplayName(), profile.foundation(), profile.tools()),
@@ -55,7 +69,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         2,
                         AiRoadmapStandardItem.Priority.HIGH,
                         20,
-                        normalizedJobName + " 직무·산업 리서치",
+                        normalizedJobName + " 주요 업무와 채용 요구 분석",
                         normalizedJobName + "의 주요 업무, 협업 대상, 진입 경로와 채용 공고의 공통 요구 역량을 조사해 비교표로 정리합니다.",
                         keywords(normalizedJobName, "직무분석", "산업분석", "채용공고", "현직자 인터뷰"),
                         "직무의 실제 역할을 이해하고 이후 활동의 우선순위를 정하기 위한 항목입니다.",
@@ -67,7 +81,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         2,
                         AiRoadmapStandardItem.Priority.MEDIUM,
                         30,
-                        normalizedJobName + " 기초 미니 프로젝트",
+                        project + " 미니 결과물 제작",
                         profile.practice() + "을 적용하여 " + profile.projectTheme()
                                 + " 주제의 작은 결과물을 완성하고 피드백을 반영합니다.",
                         keywords(normalizedJobName, "미니 프로젝트", profile.practice(), profile.tools()),
@@ -80,7 +94,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.HIGH,
                         10,
-                        normalizedJobName + " 핵심 실무 역량 강화",
+                        practice + " 심화 실습",
                         profile.foundation() + "와 " + profile.practice()
                                 + "을 실제 과제에 적용할 수 있도록 심화 학습과 반복 실습을 진행합니다.",
                         keywords(normalizedJobName, "핵심 역량", profile.foundation(), profile.practice(), profile.tools()),
@@ -93,7 +107,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.HIGH,
                         20,
-                        normalizedJobName + " 포트폴리오 프로젝트",
+                        project + " 대표 결과물 제작",
                         profile.practice() + "을 바탕으로 " + profile.projectTheme()
                                 + "를 기획·수행하고, " + profile.portfolioEvidence() + " 형태로 결과와 개선 과정을 기록합니다.",
                         keywords(normalizedJobName, "포트폴리오", "대표 프로젝트", profile.projectTheme(), profile.tools()),
@@ -106,7 +120,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.MEDIUM,
                         30,
-                        normalizedJobName + " 심화 프로젝트 확장",
+                        project + " 협업·품질 검증 확장",
                         "대표 프로젝트에 협업, 사용자·이해관계자 요구, 품질 검증, 성과 측정 요소를 추가하여 "
                                 + profile.projectTheme() + "의 완성도를 높입니다.",
                         keywords(normalizedJobName, "심화 프로젝트", "협업", "품질 검증", "성과 측정", profile.projectTheme()),
@@ -119,7 +133,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.MEDIUM,
                         40,
-                        normalizedJobName + " 관련 자격증 준비",
+                        credential + " 중 목표 자격 선택",
                         profile.credentialGuide()
                                 + "을 참고하여 현재 수준과 목표 직무에 적합한 자격·인증 또는 교육 과정을 하나 선택해 준비합니다.",
                         keywords(normalizedJobName, "자격증", "인증", "교육 이수", profile.credentialGuide()),
@@ -132,7 +146,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.HIGH,
                         50,
-                        normalizedJobName + " 인턴·현장실습 준비",
+                        fieldExperience + " 지원 준비",
                         profile.fieldExperience()
                                 + "과 관련된 인턴, 현장실습, 산학 프로젝트 또는 실무형 활동을 탐색하고 지원 자료를 준비합니다.",
                         keywords(normalizedJobName, "인턴", "현장실습", "산학 프로젝트", profile.fieldExperience()),
@@ -145,7 +159,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         3,
                         AiRoadmapStandardItem.Priority.LOW,
                         60,
-                        normalizedJobName + " 공모전·대외활동 참여",
+                        practice + " 외부 협업 참여",
                         profile.practice()
                                 + " 역량을 검증할 수 있는 공모전, 대외활동 또는 학술·산업 프로젝트에 참여해 외부 피드백과 협업 경험을 확보합니다.",
                         keywords(normalizedJobName, "공모전", "대외활동", "협업", "외부 피드백", profile.practice()),
@@ -158,7 +172,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         4,
                         AiRoadmapStandardItem.Priority.HIGH,
                         10,
-                        normalizedJobName + " 포트폴리오 완성도 개선",
+                        portfolio + " 포트폴리오 정리",
                         profile.portfolioEvidence()
                                 + "를 중심으로 대표 결과물을 선별하고, 역할·문제·과정·결과·회고가 드러나도록 포트폴리오를 보완합니다.",
                         keywords(normalizedJobName, "포트폴리오", "문제 해결", "성과", "회고", profile.portfolioEvidence()),
@@ -171,7 +185,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         4,
                         AiRoadmapStandardItem.Priority.HIGH,
                         20,
-                        normalizedJobName + " 지원서·채용 공고 분석",
+                        normalizedJobName + " 공고 요구 역량과 지원서 연결",
                         "채용 공고별 요구 역량을 분석하여 보유 경험과 연결하고, "
                                 + normalizedJobName + " 지원서와 포트폴리오 버전을 공고별로 관리합니다.",
                         keywords(normalizedJobName, "채용 공고", "지원서", "자기소개서", "경험 정리", "포트폴리오"),
@@ -184,7 +198,7 @@ public final class AiRoadmapStandardSeedCatalog {
                         4,
                         AiRoadmapStandardItem.Priority.HIGH,
                         30,
-                        normalizedJobName + " 면접·실무 과제 대비",
+                        interview + " 면접·실무 과제 연습",
                         profile.interviewFocus()
                                 + "을 중심으로 예상 질문, 경험 기반 답변, 실무 과제와 발표를 반복 연습합니다.",
                         keywords(normalizedJobName, "면접", "실무 과제", "발표", "경험 기반 답변", profile.interviewFocus()),
@@ -192,6 +206,91 @@ public final class AiRoadmapStandardSeedCatalog {
                         true
                 )
         );
+    }
+
+    private static List<StandardItemSeed> createSoftwareProfile(String jobName) {
+        return List.of(
+                software("G2_FOUNDATION", RoadmapLane.LEARNING, RoadmapItemType.PROGRAMMING_LANGUAGE, RoadmapStage.GRADE_2, 10,
+                        "Java 기본 문법과 객체지향 프로그래밍", "클래스·상속·인터페이스를 사용한 콘솔 프로그램을 구현하고 README에 설계를 설명합니다.", true, true, "Java, 객체지향, OOP"),
+                software("G2_ROLE_RESEARCH", RoadmapLane.LEARNING, RoadmapItemType.CS_SUBJECT, RoadmapStage.GRADE_2, 20,
+                        "자료구조·알고리즘 기초", "배열·리스트·스택·큐·트리를 구현하고 시간 복잡도를 설명할 수 있도록 연습합니다.", true, true, "자료구조, 알고리즘, 시간복잡도"),
+                software("G2_MINI_PROJECT", RoadmapLane.LEARNING, RoadmapItemType.CS_SUBJECT, RoadmapStage.GRADE_2, 30,
+                        "관계형 데이터베이스와 SQL", "테이블 관계를 설계하고 JOIN·집계·서브쿼리를 포함한 SQL을 작성합니다.", true, true, "SQL, 데이터베이스, RDB"),
+                software("G3_CORE_SKILL", RoadmapLane.LEARNING, RoadmapItemType.DEVELOPMENT_TOOL, RoadmapStage.GRADE_2, 40,
+                        "Git·GitHub 버전 관리와 협업", "브랜치·커밋·Pull Request 흐름으로 협업하고 충돌 해결 과정을 기록합니다.", true, true, "Git, GitHub, 협업"),
+                software("G3_PORTFOLIO_PROJECT", RoadmapLane.PROJECT, RoadmapItemType.MINI_PROJECT, RoadmapStage.GRADE_2, 50,
+                        "Spring Boot REST API 미니 프로젝트", "Controller-Service-Repository 구조로 CRUD와 예외 응답을 구현하고 API 명세를 작성합니다.", true, true, "Spring Boot, REST API, CRUD"),
+                software("G3_SPECIALIZED_PROJECT", RoadmapLane.CERTIFICATION, RoadmapItemType.CERTIFICATE, RoadmapStage.GRADE_2, 60,
+                        "SQLD 준비", "등록 자격증명으로만 완료 판정하며 SQL 기본 이론과 문제 풀이 계획을 세웁니다.", false, true, "SQLD"),
+                software("G3_CERTIFICATE", RoadmapLane.EXPERIENCE, RoadmapItemType.HACKATHON, RoadmapStage.GRADE_2, 70,
+                        "개발 동아리 또는 교내 해커톤 참여", "팀 역할을 맡아 결과물을 배포하고 기여 내용과 회고를 남깁니다.", false, true, "개발동아리, 해커톤"),
+                software("G3_FIELD_EXPERIENCE", RoadmapLane.LEARNING, RoadmapItemType.FRAMEWORK, RoadmapStage.GRADE_3, 10,
+                        "Spring Boot 계층형 아키텍처", "계층별 책임과 의존 방향을 지킨 API를 구현하고 예외 처리 정책을 적용합니다.", true, true, "Spring Boot, 계층형 아키텍처"),
+                software("G3_EXTERNAL_ACTIVITY", RoadmapLane.LEARNING, RoadmapItemType.FRAMEWORK, RoadmapStage.GRADE_3, 20,
+                        "JPA 연관관계와 트랜잭션", "연관관계 매핑·지연 로딩·트랜잭션 경계를 적용하고 쿼리 문제를 점검합니다.", true, true, "JPA, 트랜잭션, 연관관계"),
+                software("G4_PORTFOLIO_REFINEMENT", RoadmapLane.LEARNING, RoadmapItemType.CS_SUBJECT, RoadmapStage.GRADE_3, 30,
+                        "HTTP·REST·네트워크 기초", "HTTP 메서드·상태 코드·캐시와 TCP/IP 흐름을 API 동작과 연결해 설명합니다.", true, true, "HTTP, REST, 네트워크"),
+                software("G4_APPLICATION", RoadmapLane.LEARNING, RoadmapItemType.CS_SUBJECT, RoadmapStage.GRADE_3, 40,
+                        "운영체제와 동시성 기초", "프로세스·스레드·락과 동시성 문제를 Java 예제로 재현하고 해결합니다.", true, true, "운영체제, 동시성, 스레드"),
+                software("G4_INTERVIEW", RoadmapLane.LEARNING, RoadmapItemType.DEVELOPMENT_TOOL, RoadmapStage.GRADE_3, 50,
+                        "JUnit 단위·통합 테스트", "핵심 서비스 단위 테스트와 API 통합 테스트를 작성하고 실패 경로를 검증합니다.", true, true, "JUnit, 테스트, 통합테스트"),
+                software("G3_TEAM_AUTH_PROJECT", RoadmapLane.PROJECT, RoadmapItemType.TEAM_PROJECT, RoadmapStage.GRADE_3, 60,
+                        "인증·인가가 포함된 팀 백엔드 프로젝트", "역할 분담으로 인증·인가와 핵심 API를 구현하고 코드 리뷰와 배포 기록을 남깁니다.", true, true, "인증, 인가, 팀프로젝트"),
+                software("G3_DOCKER_CICD", RoadmapLane.LEARNING, RoadmapItemType.DEVELOPMENT_TOOL, RoadmapStage.GRADE_3, 70,
+                        "Docker 배포와 CI/CD", "Docker 이미지로 서비스를 실행하고 테스트·빌드·배포 자동화 파이프라인을 구성합니다.", true, true, "Docker, CI/CD, 배포"),
+                software("G3_ENGINEER_CERT", RoadmapLane.CERTIFICATION, RoadmapItemType.CERTIFICATE, RoadmapStage.GRADE_3, 80,
+                        "정보처리기사 준비", "등록 자격증명으로만 완료 판정하며 시험 범위별 학습과 문제 풀이를 진행합니다.", false, true, "정보처리기사"),
+                software("G3_EXTERNAL_BUILD", RoadmapLane.EXPERIENCE, RoadmapItemType.OPEN_SOURCE, RoadmapStage.GRADE_3, 90,
+                        "해커톤·산학 프로젝트·오픈소스 참여", "외부 협업에서 이슈·PR·발표 또는 배포 결과로 기여를 증명합니다.", false, true, "해커톤, 산학프로젝트, 오픈소스"),
+                software("G4_REDIS", RoadmapLane.LEARNING, RoadmapItemType.FRAMEWORK, RoadmapStage.GRADE_4, 10,
+                        "Redis 캐시와 성능 최적화", "캐시 적용 전후 지표를 비교하고 일관성·만료 정책과 병목 개선 근거를 기록합니다.", true, true, "Redis, 캐시, 성능"),
+                software("G4_OBSERVABILITY", RoadmapLane.LEARNING, RoadmapItemType.DEVELOPMENT_TOOL, RoadmapStage.GRADE_4, 20,
+                        "보안·로깅·모니터링", "입력 검증·권한·구조화 로그·핵심 지표를 적용하고 장애 확인 절차를 문서화합니다.", true, true, "보안, 로깅, 모니터링"),
+                software("G4_SYSTEM_DESIGN", RoadmapLane.LEARNING, RoadmapItemType.CS_SUBJECT, RoadmapStage.GRADE_4, 30,
+                        "확장 가능한 서버와 시스템 설계", "요구량을 가정하고 데이터 저장·캐시·비동기 처리·장애 대응 설계를 설명합니다.", true, true, "시스템설계, 확장성, 서버"),
+                software("G4_PRODUCTION_PORTFOLIO", RoadmapLane.PROJECT, RoadmapItemType.PORTFOLIO_PROJECT, RoadmapStage.GRADE_4, 40,
+                        "운영 환경을 고려한 백엔드 포트폴리오", "배포·보안·관측·복구를 포함한 서비스를 운영하고 의사결정과 개선 결과를 정리합니다.", true, true, "포트폴리오, 운영, 배포"),
+                software("G4_LOAD_TEST", RoadmapLane.PROJECT, RoadmapItemType.PORTFOLIO_PROJECT, RoadmapStage.GRADE_4, 50,
+                        "부하 테스트와 병목 구간 개선", "재현 가능한 부하 시나리오로 병목을 찾고 개선 전후 응답 시간과 처리량을 비교합니다.", false, true, "부하테스트, 병목, 성능"),
+                software("G4_CLOUD_CERT", RoadmapLane.CERTIFICATION, RoadmapItemType.VENDOR_CERTIFICATION, RoadmapStage.GRADE_4, 60,
+                        "클라우드 관련 인증 준비", "목표 인증을 직접 선택하고 학습 범위와 실습 기록을 관리합니다.", false, false, "클라우드, 인증"),
+                software("G4_INTERNSHIP", RoadmapLane.EXPERIENCE, RoadmapItemType.INTERNSHIP, RoadmapStage.GRADE_4, 70,
+                        "백엔드 인턴·현장실습 지원", "직무 공고를 분석해 이력서와 포트폴리오를 맞추고 지원 결과를 기록합니다.", true, true, "백엔드, 인턴, 현장실습"),
+                software("JS_CODING_TEST", RoadmapLane.EXPERIENCE, RoadmapItemType.JOB_PREPARATION, RoadmapStage.JOB_SEEKER, 10,
+                        "코딩 테스트와 알고리즘 문제 풀이", "주간 문제 풀이 목표를 세우고 오답 원인과 시간 복잡도를 기록합니다.", true, true, "코딩테스트, 알고리즘"),
+                software("JS_TECH_INTERVIEW", RoadmapLane.EXPERIENCE, RoadmapItemType.JOB_PREPARATION, RoadmapStage.JOB_SEEKER, 20,
+                        "CS·백엔드 기술 면접 준비", "CS와 프로젝트 질문에 근거·선택·결과가 드러나는 답변을 반복 연습합니다.", true, true, "CS, 백엔드, 기술면접"),
+                software("JS_GITHUB_DOCS", RoadmapLane.PROJECT, RoadmapItemType.PORTFOLIO_PROJECT, RoadmapStage.JOB_SEEKER, 30,
+                        "GitHub·README·API 문서 정리", "대표 저장소의 실행 방법·구조·API·기여·트러블슈팅을 빠짐없이 정리합니다.", true, true, "GitHub, README, API문서"),
+                software("JS_TROUBLESHOOTING", RoadmapLane.PROJECT, RoadmapItemType.PORTFOLIO_PROJECT, RoadmapStage.JOB_SEEKER, 40,
+                        "오류 해결·성능 개선 경험 정리", "문제·원인·대안·검증 지표가 드러나는 기술 사례를 작성합니다.", true, true, "오류해결, 성능개선"),
+                software("JS_POSTING_ANALYSIS", RoadmapLane.EXPERIENCE, RoadmapItemType.JOB_PREPARATION, RoadmapStage.JOB_SEEKER, 50,
+                        "채용 공고별 요구 기술 분석", "지원 공고의 필수·우대 기술을 보유 경험과 연결하고 부족한 항목을 표시합니다.", true, true, "채용공고, 요구기술"),
+                software("JS_APPLICATION_INTERVIEW", RoadmapLane.EXPERIENCE, RoadmapItemType.JOB_PREPARATION, RoadmapStage.JOB_SEEKER, 60,
+                        "이력서·자기소개서·모의 면접", "공고별 문서를 작성하고 모의 면접 피드백을 반영해 답변을 개선합니다.", true, true, "이력서, 자기소개서, 모의면접"),
+                software("JS_APPLY", RoadmapLane.EXPERIENCE, RoadmapItemType.JOB_PREPARATION, RoadmapStage.JOB_SEEKER, 70,
+                        jobName + " 신입·인턴 공고 지원", "지원 일정·전형 결과·회고를 기록하고 다음 지원 문서에 반영합니다.", true, true, "신입, 인턴, 지원")
+        );
+    }
+
+    private static StandardItemSeed software(String key, RoadmapLane lane, RoadmapItemType type,
+                                              RoadmapStage stage, int order, String title, String description,
+                                              boolean core, boolean included, String keyword) {
+        AiRoadmapStandardItem.Category category = switch (lane) {
+            case LEARNING -> AiRoadmapStandardItem.Category.COURSE;
+            case PROJECT -> AiRoadmapStandardItem.Category.PROJECT;
+            case CERTIFICATION -> AiRoadmapStandardItem.Category.CERTIFICATE;
+            case EXPERIENCE -> type == RoadmapItemType.INTERNSHIP
+                    ? AiRoadmapStandardItem.Category.INTERNSHIP
+                    : type == RoadmapItemType.HACKATHON || type == RoadmapItemType.CONTEST
+                    ? AiRoadmapStandardItem.Category.CONTEST : AiRoadmapStandardItem.Category.ETC;
+        };
+        AiRoadmapStandardItem.Priority priority = core
+                ? AiRoadmapStandardItem.Priority.HIGH : AiRoadmapStandardItem.Priority.MEDIUM;
+        return new StandardItemSeed(key, category, stage.getGrade(), priority, order,
+                limit(title, TITLE_MAX_LENGTH), limit(description, DESCRIPTION_MAX_LENGTH),
+                limit(keyword, KEYWORD_MAX_LENGTH), "개인 스펙 증거를 보수적으로 반영하며 사용자가 직접 완료 상태를 조정할 수 있습니다.",
+                null, included, lane, type, stage, core, included, TEMPLATE_VERSION);
     }
 
     private static StandardItemSeed seed(
@@ -217,8 +316,27 @@ public final class AiRoadmapStandardSeedCatalog {
                 limit(keyword, KEYWORD_MAX_LENGTH),
                 limit(recommendationReason, REASON_MAX_LENGTH),
                 null,
-                requiredItem
+                requiredItem,
+                AiRoadmapStandardItem.inferLane(category),
+                inferItemType(category, title),
+                RoadmapStage.fromGrade(targetGrade),
+                requiredItem,
+                requiredItem,
+                TEMPLATE_VERSION
         );
+    }
+
+    private static RoadmapItemType inferItemType(AiRoadmapStandardItem.Category category, String title) {
+        String value = title == null ? "" : title;
+        return switch (category) {
+            case COURSE -> RoadmapItemType.OTHER;
+            case PROJECT -> value.contains("미니") ? RoadmapItemType.MINI_PROJECT
+                    : value.contains("팀") ? RoadmapItemType.TEAM_PROJECT : RoadmapItemType.PORTFOLIO_PROJECT;
+            case CERTIFICATE -> RoadmapItemType.CERTIFICATE;
+            case CONTEST -> value.contains("해커톤") ? RoadmapItemType.HACKATHON : RoadmapItemType.CONTEST;
+            case INTERNSHIP -> RoadmapItemType.INTERNSHIP;
+            case ETC -> RoadmapItemType.JOB_PREPARATION;
+        };
     }
 
     private static String keywords(String... values) {
@@ -414,8 +532,19 @@ public final class AiRoadmapStandardSeedCatalog {
             String keyword,
             String recommendationReason,
             String externalUrl,
-            boolean requiredItem
+            boolean requiredItem,
+            RoadmapLane roadmapLane,
+            RoadmapItemType itemType,
+            RoadmapStage targetStage,
+            boolean coreItem,
+            boolean defaultIncluded,
+            int templateVersion
     ) {
+    }
+
+    private static String firstClause(String value) {
+        if (value == null || value.isBlank()) return "직무 핵심 주제";
+        return value.split("[,·]")[0].trim();
     }
 
     private record DomainProfile(
