@@ -8,10 +8,19 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "ai_roadmap_standard_item", indexes = {
-        @Index(name = "idx_ai_standard_job", columnList = "job_id"),
-        @Index(name = "idx_ai_standard_job_grade_category", columnList = "job_id,target_grade,category")
-})
+@Table(
+        name = "ai_roadmap_standard_item",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_ai_standard_job_seed",
+                        columnNames = {"job_id", "seed_key"}
+                )
+        },
+        indexes = {
+                @Index(name = "idx_ai_standard_job", columnList = "job_id"),
+                @Index(name = "idx_ai_standard_job_grade_category", columnList = "job_id,target_grade,category")
+        }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AiRoadmapStandardItem extends BaseEntity {
@@ -27,6 +36,13 @@ public class AiRoadmapStandardItem extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "job_id", nullable = false)
     private Job job;
+
+    /**
+     * 서버 시작 시 생성되는 표준 항목의 안정적인 식별자입니다.
+     * 관리자 API로 직접 등록한 항목은 null이며, 동일 직무 안에서는 중복될 수 없습니다.
+     */
+    @Column(name = "seed_key", length = 80)
+    private String seedKey;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 30)
@@ -60,10 +76,22 @@ public class AiRoadmapStandardItem extends BaseEntity {
     @Column(name = "required_item", nullable = false)
     private boolean requiredItem;
 
-    private AiRoadmapStandardItem(Job job, Category category, Integer targetGrade, Priority priority,
-                                  Integer displayOrder, String title, String description, String keyword,
-                                  String recommendationReason, String externalUrl, boolean requiredItem) {
+    private AiRoadmapStandardItem(
+            Job job,
+            String seedKey,
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem
+    ) {
         this.job = job;
+        this.seedKey = seedKey;
         this.category = category;
         this.targetGrade = targetGrade;
         this.priority = priority;
@@ -76,17 +104,81 @@ public class AiRoadmapStandardItem extends BaseEntity {
         this.requiredItem = requiredItem;
     }
 
-    public static AiRoadmapStandardItem create(Job job, Category category, Integer targetGrade,
-                                                Priority priority, Integer displayOrder, String title,
-                                                String description, String keyword, String recommendationReason,
-                                                String externalUrl, boolean requiredItem) {
-        return new AiRoadmapStandardItem(job, category, targetGrade, priority, displayOrder, title,
-                description, keyword, recommendationReason, externalUrl, requiredItem);
+    public static AiRoadmapStandardItem create(
+            Job job,
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem
+    ) {
+        return new AiRoadmapStandardItem(
+                job,
+                null,
+                category,
+                targetGrade,
+                priority,
+                displayOrder,
+                title,
+                description,
+                keyword,
+                recommendationReason,
+                externalUrl,
+                requiredItem
+        );
     }
 
-    public void update(Category category, Integer targetGrade, Priority priority, Integer displayOrder,
-                       String title, String description, String keyword, String recommendationReason,
-                       String externalUrl, boolean requiredItem) {
+    public static AiRoadmapStandardItem createSeeded(
+            Job job,
+            String seedKey,
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem
+    ) {
+        if (seedKey == null || seedKey.isBlank()) {
+            throw new IllegalArgumentException("표준 로드맵 seedKey는 비어 있을 수 없습니다.");
+        }
+
+        return new AiRoadmapStandardItem(
+                job,
+                seedKey.trim(),
+                category,
+                targetGrade,
+                priority,
+                displayOrder,
+                title,
+                description,
+                keyword,
+                recommendationReason,
+                externalUrl,
+                requiredItem
+        );
+    }
+
+    public void update(
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem
+    ) {
         this.category = category;
         this.targetGrade = targetGrade;
         this.priority = priority;
@@ -97,5 +189,28 @@ public class AiRoadmapStandardItem extends BaseEntity {
         this.recommendationReason = recommendationReason;
         this.externalUrl = externalUrl;
         this.requiredItem = requiredItem;
+    }
+
+    /**
+     * 이전에 수동으로 삽입된 동일 항목을 초기 데이터로 승격할 때만 사용합니다.
+     * 한 번 지정된 seedKey는 다른 값으로 변경할 수 없습니다.
+     */
+    public void assignSeedKeyIfAbsent(String seedKey) {
+        if (seedKey == null || seedKey.isBlank()) {
+            throw new IllegalArgumentException("표준 로드맵 seedKey는 비어 있을 수 없습니다.");
+        }
+
+        String normalizedSeedKey = seedKey.trim();
+        if (this.seedKey == null) {
+            this.seedKey = normalizedSeedKey;
+            return;
+        }
+
+        if (!this.seedKey.equals(normalizedSeedKey)) {
+            throw new IllegalStateException(
+                    "이미 다른 seedKey가 지정된 표준 로드맵 항목입니다. current="
+                            + this.seedKey + ", requested=" + normalizedSeedKey
+            );
+        }
     }
 }

@@ -3,21 +3,27 @@ package com.Hstep.Hstep.domain.airoadmap.service;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapChangeProposal;
 import com.Hstep.Hstep.domain.airoadmap.exception.AiRoadmapResponseCode;
 import com.Hstep.Hstep.global.exception.BaseException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
 @Component
 @Primary
-@RequiredArgsConstructor
 @Slf4j
 public class GeminiAiRoadmapIntentClassifier implements AiRoadmapIntentClassifier {
 
     private final ChatModel chatModel;
     private final JsonMapper jsonMapper;
+    public GeminiAiRoadmapIntentClassifier(
+            @Qualifier("googleGenAiChatModel") ChatModel chatModel,
+            JsonMapper jsonMapper
+    ) {
+        this.chatModel = chatModel;
+        this.jsonMapper = jsonMapper;
+    }
 
     @Override
     public AiRoadmapChangeProposal.ActionType classify(String message) {
