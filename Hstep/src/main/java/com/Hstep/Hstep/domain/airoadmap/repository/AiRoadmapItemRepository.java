@@ -10,10 +10,9 @@ import java.util.Optional;
 public interface AiRoadmapItemRepository extends JpaRepository<AiRoadmapItem, Long> {
 
     @EntityGraph(attributePaths = "standardItem")
-    List<AiRoadmapItem> findAllByAiRoadmap_AiRoadmapIdOrderByStandardItem_TargetGradeAscStandardItem_DisplayOrderAsc(Long aiRoadmapId);
+    List<AiRoadmapItem> findAllByAiRoadmap_AiRoadmapId(Long aiRoadmapId);
 
     @EntityGraph(attributePaths = "standardItem")
     Optional<AiRoadmapItem> findByAiRoadmap_AiRoadmapIdAndStandardItem_StandardItemId(Long aiRoadmapId, Long standardItemId);
 
-    void deleteAllByAiRoadmap_AiRoadmapId(Long aiRoadmapId);
 }

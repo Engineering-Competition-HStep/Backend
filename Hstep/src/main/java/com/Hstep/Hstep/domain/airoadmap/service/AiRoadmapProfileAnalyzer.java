@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -102,5 +104,38 @@ public class AiRoadmapProfileAnalyzer {
                 .filter(value -> value != null && !value.isBlank())
                 .map(value -> value.toLowerCase(Locale.ROOT))
                 .reduce("", (left, right) -> left + " " + right);
+    }
+
+    public Set<String> certificateNames(String userId) {
+        return certificateRepository.findByMember_UserId(userId).stream()
+                .map(Certificate::getCertificateName)
+                .filter(value -> value != null && !value.isBlank())
+                .map(AiRoadmapProfileAnalyzer::normalizeEvidence)
+                .collect(Collectors.toSet());
+    }
+
+    public List<String> activityEvidence(String userId) {
+        List<String> values = new ArrayList<>();
+        for (Award award : awardRepository.findByMember_UserId(userId)) {
+            values.add(join(award.getCompetitionName(), award.getAwardName(), award.getDescription()));
+        }
+        for (Volunteer volunteer : volunteerRepository.findByMember_UserId(userId)) {
+            values.add(join(volunteer.getVolunteerName(), volunteer.getDescription()));
+        }
+        for (ExtraActivity activity : extraActivityRepository.findByMember_UserId(userId)) {
+            values.add(join(activity.getActivityName(), activity.getFieldKeyword(), activity.getDescription()));
+        }
+        return values.stream().filter(value -> !value.isBlank()).toList();
+    }
+
+    static String normalizeEvidence(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT)
+                .replaceAll("[^0-9a-z가-힣]", "");
+    }
+
+    private static String join(String... values) {
+        return java.util.Arrays.stream(values)
+                .filter(value -> value != null && !value.isBlank())
+                .collect(Collectors.joining(" "));
     }
 }

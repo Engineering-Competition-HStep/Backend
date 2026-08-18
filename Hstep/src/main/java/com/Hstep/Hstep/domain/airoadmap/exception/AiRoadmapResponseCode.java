@@ -33,7 +33,8 @@ public enum AiRoadmapResponseCode implements BaseResponseCode {
     CHAT_SUCCESS("AI_ROADMAP_200_6", OK, "AI 로드맵 요청을 처리했습니다."),
     PROPOSAL_APPLY_SUCCESS("AI_ROADMAP_200_7", OK, "로드맵 변경 제안을 반영했습니다."),
     PROPOSAL_CANCEL_SUCCESS("AI_ROADMAP_200_8", OK, "로드맵 변경 제안을 취소했습니다."),
-    STANDARD_ITEM_MANAGE_SUCCESS("AI_ROADMAP_200_9", OK, "직무별 표준 로드맵 데이터를 처리했습니다.");
+    STANDARD_ITEM_MANAGE_SUCCESS("AI_ROADMAP_200_9", OK, "직무별 표준 로드맵 데이터를 처리했습니다."),
+    CHAT_HISTORY_GET_SUCCESS("AI_ROADMAP_200_10", OK, "AI 로드맵 채팅 내역을 조회했습니다.");
 
     private final String code;
     private final int httpStatus;

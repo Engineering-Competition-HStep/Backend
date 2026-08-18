@@ -76,6 +76,27 @@ public class AiRoadmapStandardItem extends BaseEntity {
     @Column(name = "required_item", nullable = false)
     private boolean requiredItem;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "roadmap_lane", length = 30)
+    private RoadmapLane roadmapLane;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "item_type", length = 40)
+    private RoadmapItemType itemType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_stage", length = 30)
+    private RoadmapStage targetStage;
+
+    @Column(name = "core_item")
+    private Boolean coreItem;
+
+    @Column(name = "default_included")
+    private Boolean defaultIncluded;
+
+    @Column(name = "template_version")
+    private Integer templateVersion;
+
     private AiRoadmapStandardItem(
             Job job,
             String seedKey,
@@ -102,6 +123,11 @@ public class AiRoadmapStandardItem extends BaseEntity {
         this.recommendationReason = recommendationReason;
         this.externalUrl = externalUrl;
         this.requiredItem = requiredItem;
+        this.roadmapLane = inferLane(category);
+        this.itemType = inferItemType(category);
+        this.targetStage = RoadmapStage.fromGrade(targetGrade);
+        this.coreItem = requiredItem;
+        this.defaultIncluded = requiredItem;
     }
 
     public static AiRoadmapStandardItem create(
@@ -167,6 +193,32 @@ public class AiRoadmapStandardItem extends BaseEntity {
         );
     }
 
+    public static AiRoadmapStandardItem createSeeded(
+            Job job,
+            String seedKey,
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem,
+            RoadmapLane roadmapLane,
+            RoadmapItemType itemType,
+            RoadmapStage targetStage,
+            boolean coreItem,
+            boolean defaultIncluded,
+            int templateVersion
+    ) {
+        AiRoadmapStandardItem item = createSeeded(job, seedKey, category, targetGrade, priority,
+                displayOrder, title, description, keyword, recommendationReason, externalUrl, requiredItem);
+        item.applyTemplateMetadata(roadmapLane, itemType, targetStage, coreItem, defaultIncluded, templateVersion);
+        return item;
+    }
+
     public void update(
             Category category,
             Integer targetGrade,
@@ -189,6 +241,116 @@ public class AiRoadmapStandardItem extends BaseEntity {
         this.recommendationReason = recommendationReason;
         this.externalUrl = externalUrl;
         this.requiredItem = requiredItem;
+    }
+
+    public void update(
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem,
+            RoadmapLane roadmapLane,
+            RoadmapItemType itemType,
+            RoadmapStage targetStage,
+            Boolean coreItem,
+            Boolean defaultIncluded
+    ) {
+        update(category, targetGrade, priority, displayOrder, title, description, keyword,
+                recommendationReason, externalUrl, requiredItem);
+        this.roadmapLane = roadmapLane != null ? roadmapLane : inferLane(category);
+        this.itemType = itemType != null ? itemType : inferItemType(category);
+        this.targetStage = targetStage != null ? targetStage : RoadmapStage.fromGrade(targetGrade);
+        this.coreItem = coreItem != null ? coreItem : requiredItem;
+        this.defaultIncluded = defaultIncluded != null ? defaultIncluded : requiredItem;
+    }
+
+    public void synchronizeTemplate(
+            Category category,
+            Integer targetGrade,
+            Priority priority,
+            Integer displayOrder,
+            String title,
+            String description,
+            String keyword,
+            String recommendationReason,
+            String externalUrl,
+            boolean requiredItem,
+            RoadmapLane roadmapLane,
+            RoadmapItemType itemType,
+            RoadmapStage targetStage,
+            boolean coreItem,
+            boolean defaultIncluded,
+            int templateVersion
+    ) {
+        update(category, targetGrade, priority, displayOrder, title, description, keyword,
+                recommendationReason, externalUrl, requiredItem, roadmapLane, itemType, targetStage,
+                coreItem, defaultIncluded);
+        this.templateVersion = templateVersion;
+    }
+
+    public boolean isCoreItemEffective() {
+        return coreItem != null ? coreItem : requiredItem;
+    }
+
+    public boolean isDefaultIncludedEffective() {
+        return defaultIncluded != null ? defaultIncluded : requiredItem;
+    }
+
+    public RoadmapLane getRoadmapLaneEffective() {
+        return roadmapLane != null ? roadmapLane : inferLane(category);
+    }
+
+    public RoadmapItemType getItemTypeEffective() {
+        return itemType != null ? itemType : inferItemType(category);
+    }
+
+    public RoadmapStage getTargetStageEffective() {
+        return targetStage != null ? targetStage : RoadmapStage.fromGrade(targetGrade);
+    }
+
+    public void backfillLegacyMetadata() {
+        if (roadmapLane == null) roadmapLane = inferLane(category);
+        if (itemType == null) itemType = inferItemType(category);
+        if (targetStage == null) targetStage = RoadmapStage.fromGrade(targetGrade);
+        if (coreItem == null) coreItem = requiredItem;
+        if (defaultIncluded == null) defaultIncluded = requiredItem;
+    }
+
+    private void applyTemplateMetadata(RoadmapLane roadmapLane, RoadmapItemType itemType,
+                                       RoadmapStage targetStage, boolean coreItem,
+                                       boolean defaultIncluded, int templateVersion) {
+        this.roadmapLane = roadmapLane;
+        this.itemType = itemType;
+        this.targetStage = targetStage;
+        this.coreItem = coreItem;
+        this.defaultIncluded = defaultIncluded;
+        this.templateVersion = templateVersion;
+    }
+
+    public static RoadmapLane inferLane(Category category) {
+        return switch (category) {
+            case COURSE -> RoadmapLane.LEARNING;
+            case PROJECT -> RoadmapLane.PROJECT;
+            case CERTIFICATE -> RoadmapLane.CERTIFICATION;
+            case CONTEST, INTERNSHIP -> RoadmapLane.EXPERIENCE;
+            case ETC -> RoadmapLane.EXPERIENCE;
+        };
+    }
+
+    public static RoadmapItemType inferItemType(Category category) {
+        return switch (category) {
+            case COURSE -> RoadmapItemType.OTHER;
+            case PROJECT -> RoadmapItemType.PORTFOLIO_PROJECT;
+            case CERTIFICATE -> RoadmapItemType.CERTIFICATE;
+            case CONTEST -> RoadmapItemType.CONTEST;
+            case INTERNSHIP -> RoadmapItemType.INTERNSHIP;
+            case ETC -> RoadmapItemType.OTHER;
+        };
     }
 
     /**

@@ -2,6 +2,8 @@ package com.Hstep.Hstep.domain.airoadmap.controller;
 
 import com.Hstep.Hstep.domain.airoadmap.dto.AiRoadmapDto;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapStandardItem;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapLane;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapStage;
 import com.Hstep.Hstep.domain.airoadmap.exception.AiRoadmapResponseCode;
 import com.Hstep.Hstep.domain.airoadmap.service.AiRoadmapChatService;
 import com.Hstep.Hstep.domain.airoadmap.service.AiRoadmapService;
@@ -29,6 +31,16 @@ public class AiRoadmapController {
         return SuccessResponse.of(
                 aiRoadmapService.checkEligibility(principal.getUserId()),
                 AiRoadmapResponseCode.ELIGIBILITY_GET_SUCCESS
+        );
+    }
+
+    @GetMapping("/entry")
+    public SuccessResponse<AiRoadmapDto.EntryResponse> getEntry(
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        return SuccessResponse.of(
+                aiRoadmapService.getEntry(principal.getUserId()),
+                AiRoadmapResponseCode.ROADMAP_GET_SUCCESS
         );
     }
 
@@ -66,11 +78,23 @@ public class AiRoadmapController {
     public SuccessResponse<AiRoadmapDto.RoadmapResponse> getMyRoadmap(
             @AuthenticationPrincipal MemberPrincipal principal,
             @RequestParam(required = false) Integer grade,
-            @RequestParam(required = false) AiRoadmapStandardItem.Category category
+            @RequestParam(required = false) AiRoadmapStandardItem.Category category,
+            @RequestParam(required = false) RoadmapStage stage,
+            @RequestParam(required = false) RoadmapLane lane
     ) {
         return SuccessResponse.of(
-                aiRoadmapService.getMyRoadmap(principal.getUserId(), grade, category),
+                aiRoadmapService.getMyRoadmap(principal.getUserId(), grade, category, stage, lane),
                 AiRoadmapResponseCode.ROADMAP_GET_SUCCESS
+        );
+    }
+
+    @GetMapping("/chat/history")
+    public SuccessResponse<AiRoadmapDto.ChatHistoryResponse> getChatHistory(
+            @AuthenticationPrincipal MemberPrincipal principal
+    ) {
+        return SuccessResponse.of(
+                aiRoadmapChatService.getHistory(principal.getUserId()),
+                AiRoadmapResponseCode.CHAT_HISTORY_GET_SUCCESS
         );
     }
 
