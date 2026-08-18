@@ -1,13 +1,11 @@
 package com.Hstep.Hstep.domain.airoadmap.service;
 
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapChangeProposal;
-import com.Hstep.Hstep.global.exception.BaseException;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,17 +37,35 @@ class GeminiAiRoadmapIntentClassifierTest {
     }
 
     @Test
-    void Gemini응답이_잘못되면_BaseException을_발생시킨다() {
-        when(chatModel.call(anyString())).thenReturn("invalid response");
+    void Gemini의_구조화된_이동_명령을_복원한다() {
+        when(chatModel.call(anyString())).thenReturn("""
+                {"actionType":"MOVE_ITEM","targetRoadmapItemId":7,
+                 "after":{"roadmapLane":"LEARNING","targetStage":"GRADE_4","displayOrder":20},
+                 "reason":"4학년으로 이동"}
+                """);
 
-        assertThrows(BaseException.class, () -> classifier.classify("프로젝트 추천해줘"));
+        AiRoadmapCommand command = classifier.command("7번 항목을 4학년으로 옮겨줘");
+
+        assertEquals(AiRoadmapChangeProposal.ActionType.MOVE_ITEM, command.actionType());
+        assertEquals(7L, command.targetRoadmapItemId());
+        assertEquals("GRADE_4", command.after().targetStage().name());
+        assertEquals("LEARNING", command.after().roadmapLane().name());
     }
 
     @Test
-    void Gemini응답의_actionType이_비어있으면_BaseException을_발생시킨다() {
+    void Gemini응답이_잘못되면_규칙_기반으로_fallback한다() {
+        when(chatModel.call(anyString())).thenReturn("invalid response");
+
+        assertEquals(AiRoadmapChangeProposal.ActionType.ADD_CUSTOM_ITEM,
+                classifier.classify("프로젝트 추천해줘"));
+    }
+
+    @Test
+    void Gemini응답의_actionType이_비어있으면_규칙_기반으로_fallback한다() {
         when(chatModel.call(anyString())).thenReturn("{\"actionType\":\"\"}");
 
-        assertThrows(BaseException.class, () -> classifier.classify("프로젝트 추천해줘"));
+        assertEquals(AiRoadmapChangeProposal.ActionType.ADD_CUSTOM_ITEM,
+                classifier.classify("프로젝트 추천해줘"));
     }
 
     @Test

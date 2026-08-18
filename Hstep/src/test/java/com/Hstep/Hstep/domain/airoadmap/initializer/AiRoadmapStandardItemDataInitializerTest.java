@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -62,7 +63,7 @@ class AiRoadmapStandardItemDataInitializerTest {
         List<AiRoadmapStandardItem> savedItems = captor.getValue();
 
         assertThat(savedItems)
-                .hasSize(AiRoadmapStandardSeedCatalog.ITEMS_PER_JOB)
+                .hasSize(AiRoadmapStandardSeedCatalog.createFor(job).size())
                 .allSatisfy(item -> assertThat(item.getJob()).isSameAs(job));
 
         assertThat(savedItems)
@@ -92,7 +93,29 @@ class AiRoadmapStandardItemDataInitializerTest {
     }
 
     @Test
-    void 동일한_자연키의_기존_수동_항목은_중복_생성하지_않고_seedKey를_부여한다() {
+    void 이전_버전_자동_시드는_같은_seedKey로_안전하게_갱신한다() {
+        Job job = createJob(1L, "백엔드 개발자", JobCategory.SOFTWARE);
+        List<StandardItemSeed> seeds = AiRoadmapStandardSeedCatalog.createFor(job);
+        List<AiRoadmapStandardItem> existingItems = new ArrayList<>();
+        StandardItemSeed first = seeds.getFirst();
+        AiRoadmapStandardItem legacy = AiRoadmapStandardItem.createSeeded(job, first.seedKey(),
+                first.category(), first.targetGrade(), first.priority(), first.displayOrder(),
+                "이전 포괄 제목", "이전 설명", "이전", "이전", null, first.requiredItem());
+        existingItems.add(legacy);
+        seeds.stream().skip(1).map(seed -> toSeededEntity(job, seed)).forEach(existingItems::add);
+        when(jobRepository.findAllByOrderByJobNameAsc()).thenReturn(List.of(job));
+        when(standardItemRepository.findAllWithJob()).thenReturn(existingItems);
+
+        initializer.initialize();
+
+        verify(standardItemRepository, never()).saveAll(anyList());
+        verify(standardItemRepository).flush();
+        assertThat(legacy.getTitle()).isEqualTo(first.title());
+        assertThat(legacy.getTemplateVersion()).isEqualTo(AiRoadmapStandardSeedCatalog.TEMPLATE_VERSION);
+    }
+
+    @Test
+    void 동일한_자연키의_기존_수동_항목도_수정하지_않고_보존한다() {
         Job job = createJob(1L, "백엔드 개발자", JobCategory.SOFTWARE);
         StandardItemSeed legacySeed =
                 AiRoadmapStandardSeedCatalog.createFor(job).getFirst();
@@ -126,10 +149,9 @@ class AiRoadmapStandardItemDataInitializerTest {
         verify(standardItemRepository).saveAll(captor.capture());
         verify(standardItemRepository).flush();
 
-        assertThat(legacyItem.getSeedKey())
-                .isEqualTo(legacySeed.seedKey());
+        assertThat(legacyItem.getSeedKey()).isNull();
         assertThat(captor.getValue())
-                .hasSize(AiRoadmapStandardSeedCatalog.ITEMS_PER_JOB - 1);
+                .hasSize(AiRoadmapStandardSeedCatalog.createFor(job).size());
     }
 
     @Test
@@ -166,7 +188,13 @@ class AiRoadmapStandardItemDataInitializerTest {
                 seed.keyword(),
                 seed.recommendationReason(),
                 seed.externalUrl(),
-                seed.requiredItem()
+                seed.requiredItem(),
+                seed.roadmapLane(),
+                seed.itemType(),
+                seed.targetStage(),
+                seed.coreItem(),
+                seed.defaultIncluded(),
+                seed.templateVersion()
         );
     }
 }

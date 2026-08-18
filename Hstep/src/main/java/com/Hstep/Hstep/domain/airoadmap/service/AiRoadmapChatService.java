@@ -5,8 +5,16 @@ import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmap;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapChangeProposal;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapItem;
 import com.Hstep.Hstep.domain.airoadmap.entity.AiRoadmapStandardItem;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapItemSourceType;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapItemType;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapLane;
+import com.Hstep.Hstep.domain.airoadmap.entity.RoadmapStage;
 import com.Hstep.Hstep.domain.airoadmap.exception.AiRoadmapResponseCode;
 import com.Hstep.Hstep.domain.airoadmap.repository.AiRoadmapChangeProposalRepository;
+import com.Hstep.Hstep.domain.chat.entity.ChatMessage;
+import com.Hstep.Hstep.domain.chat.entity.ChatRole;
+import com.Hstep.Hstep.domain.chat.entity.ChatRoom;
+import com.Hstep.Hstep.domain.chat.service.ChatService;
 import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
@@ -25,24 +33,69 @@ public class AiRoadmapChatService {
     private final AiRoadmapProfileAnalyzer profileAnalyzer;
     private final AiRoadmapIntentClassifier intentClassifier;
     private final AiRoadmapChangeProposalRepository proposalRepository;
+    private final ChatService chatService;
 
     @Transactional
     public AiRoadmapDto.ChatResponse chat(String userId, AiRoadmapDto.ChatRequest request) {
         aiRoadmapService.requireEligible(userId);
         AiRoadmap roadmap = aiRoadmapService.findRoadmap(userId);
-        AiRoadmapChangeProposal.ActionType actionType = intentClassifier.classify(request.message());
+        ChatRoom room = chatService.getOrCreateRoadmapRoom(userId, roadmap.getAiRoadmapId());
+        chatService.appendRoadmapMessage(room, ChatRole.USER, request.message(), null);
+        AiRoadmapCommand command = intentClassifier.command(request.message());
+        request = mergeExplicitRequest(request, command);
+        AiRoadmapChangeProposal.ActionType actionType = command.actionType();
 
-        return switch (actionType) {
+        AiRoadmapDto.ChatResponse response = switch (actionType) {
             case CHANGE_INTEREST_JOB -> proposeJobChange(userId, roadmap, request);
             case ADD_ROADMAP_ITEM -> proposeItemAddition(userId, roadmap, request);
-            case COMPLETE_ROADMAP_ITEM -> proposeItemChange(userId, roadmap, request,
-                    AiRoadmapChangeProposal.ActionType.COMPLETE_ROADMAP_ITEM);
-            case HIDE_ROADMAP_ITEM -> proposeItemChange(userId, roadmap, request,
-                    AiRoadmapChangeProposal.ActionType.HIDE_ROADMAP_ITEM);
+            case ADD_CUSTOM_ITEM -> proposeCustomAddition(userId, roadmap, request);
+            case EDIT_ITEM -> proposeEdit(userId, roadmap, request, false);
+            case REPLACE_ITEM -> proposeEdit(userId, roadmap, request, true);
+            case MOVE_ITEM -> proposeMove(userId, roadmap, request);
+            case COMPLETE_ITEM, COMPLETE_ROADMAP_ITEM -> proposeItemChange(userId, roadmap, request,
+                    AiRoadmapChangeProposal.ActionType.COMPLETE_ITEM);
+            case REOPEN_ITEM -> proposeItemChange(userId, roadmap, request,
+                    AiRoadmapChangeProposal.ActionType.REOPEN_ITEM);
+            case REMOVE_ITEM, HIDE_ROADMAP_ITEM -> proposeItemChange(userId, roadmap, request,
+                    AiRoadmapChangeProposal.ActionType.REMOVE_ITEM);
             case CHANGE_PRIORITY -> proposePriorityChange(userId, roadmap, request);
             case EXPLAIN_ROADMAP_ITEM -> explainItem(roadmap, request);
             case NO_ACTION -> guidePriorityOrSupportedRequest(roadmap, request);
         };
+        String proposalId = response.proposal() == null ? null : response.proposal().proposalId();
+        chatService.appendRoadmapMessage(room, ChatRole.ASSISTANT, response.message(), proposalId);
+        return response;
+    }
+
+    public AiRoadmapDto.ChatHistoryResponse getHistory(String userId) {
+        AiRoadmap roadmap = aiRoadmapService.findRoadmap(userId);
+        ChatRoom room = chatService.findRoadmapRoom(userId, roadmap.getAiRoadmapId());
+        if (room == null) return new AiRoadmapDto.ChatHistoryResponse(null, List.of());
+        List<AiRoadmapDto.ChatHistoryMessageResponse> messages = chatService
+                .findRoadmapMessages(userId, roadmap.getAiRoadmapId()).stream()
+                .map(this::toHistoryMessage)
+                .toList();
+        return new AiRoadmapDto.ChatHistoryResponse(room.getChatRoomId(), messages);
+    }
+
+    private AiRoadmapDto.ChatHistoryMessageResponse toHistoryMessage(ChatMessage message) {
+        AiRoadmapChangeProposal proposal = message.getProposalId() == null ? null
+                : proposalRepository.findById(message.getProposalId()).orElse(null);
+        AiRoadmapChangeProposal.Status status = proposal == null ? null : proposal.getStatus();
+        return new AiRoadmapDto.ChatHistoryMessageResponse(
+                message.getChatId(), message.getRole(), message.getContent(), message.getProposalId(), status,
+                status == AiRoadmapChangeProposal.Status.PENDING, message.getCreatedAt());
+    }
+
+    private AiRoadmapDto.ChatRequest mergeExplicitRequest(AiRoadmapDto.ChatRequest request,
+                                                           AiRoadmapCommand command) {
+        return new AiRoadmapDto.ChatRequest(
+                request.message(), request.selectedGrade(), request.selectedCategory(),
+                request.targetRoadmapItemId() != null ? request.targetRoadmapItemId()
+                        : command.targetRoadmapItemId(),
+                request.targetJobId() != null ? request.targetJobId() : command.targetJobId(),
+                request.selectedStage(), request.selectedLane(), request.selectedItemType(),
+                request.after() != null ? request.after() : command.after());
     }
 
     private AiRoadmapDto.ChatResponse proposeJobChange(String userId, AiRoadmap roadmap,
@@ -75,7 +128,10 @@ public class AiRoadmapChatService {
                 + "개 항목이 있습니다. 공통 완료 항목은 완료 상태를 유지합니다.";
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
                 AiRoadmapChangeProposal.ActionType.CHANGE_INTEREST_JOB,
-                null, null, selected.jobId(), null, message);
+                null, null, selected.jobId(), null, message,
+                Map.of("interestJobId", roadmap.getInterestJob().getJobId(),
+                        "interestJobName", roadmap.getInterestJob().getJobName()),
+                Map.of("interestJobId", selected.jobId(), "interestJobName", selected.jobName()));
 
         return responseWithProposal(message, proposal, options, null, diff);
     }
@@ -91,8 +147,8 @@ public class AiRoadmapChatService {
 
         Map<String, String> currentByKey = currentItems.stream()
                 .collect(Collectors.toMap(
-                        item -> completionKey(item.getStandardItem()),
-                        item -> item.getStandardItem().getTitle(),
+                        this::completionKey,
+                        AiRoadmapItem::getTitle,
                         (first, ignored) -> first,
                         LinkedHashMap::new
                 ));
@@ -131,6 +187,7 @@ public class AiRoadmapChatService {
         Member member = profileAnalyzer.getMemberWithTracks(userId);
         int grade = request.selectedGrade() != null ? request.selectedGrade() : member.getGrade();
         Set<Long> existingStandardIds = aiRoadmapService.getAllItems(roadmap).stream()
+                .filter(item -> item.getStandardItem() != null)
                 .map(item -> item.getStandardItem().getStandardItemId())
                 .collect(Collectors.toSet());
 
@@ -167,21 +224,98 @@ public class AiRoadmapChatService {
                 + reasonSuffix(standard.getRecommendationReason());
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
                 AiRoadmapChangeProposal.ActionType.ADD_ROADMAP_ITEM,
-                null, standard.getStandardItemId(), null, standard.getPriority(), message);
+                null, standard.getStandardItemId(), null, standard.getPriority(), message,
+                Map.of(), draftSnapshot(standard.getTitle(), standard.getDescription(),
+                        standard.getRoadmapLaneEffective(), standard.getItemTypeEffective(),
+                        standard.getTargetStageEffective(), standard.getDisplayOrder(), standard.getPriority()));
 
         return responseWithProposal(message, proposal, List.of(), null, null);
+    }
+
+    private AiRoadmapDto.ChatResponse proposeCustomAddition(String userId, AiRoadmap roadmap,
+                                                              AiRoadmapDto.ChatRequest request) {
+        AiRoadmapDto.RoadmapItemDraft draft = request.after();
+        if (draft == null || draft.title() == null || draft.title().isBlank()) return unsupportedGuide();
+        RoadmapStage stage = firstNonNull(draft.targetStage(), request.selectedStage(),
+                RoadmapStage.fromGrade(request.selectedGrade() != null
+                        ? request.selectedGrade() : roadmap.getMember().getGrade()));
+        RoadmapLane lane = firstNonNull(draft.roadmapLane(), request.selectedLane(), RoadmapLane.EXPERIENCE);
+        RoadmapItemType itemType = firstNonNull(draft.itemType(), request.selectedItemType(), RoadmapItemType.OTHER);
+        Map<String, Object> after = draftSnapshot(draft.title(), draft.description(), lane, itemType,
+                stage, draft.displayOrder(), draft.priority());
+        validateNoDuplicate(roadmap, draft.title(), stage, lane, null);
+        String message = "'" + draft.title().trim() + "' 항목을 개인 로드맵에 추가합니다.";
+        AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
+                AiRoadmapChangeProposal.ActionType.ADD_CUSTOM_ITEM, null, null, null,
+                draft.priority(), message, Map.of(), after);
+        return responseWithProposal(message, proposal, List.of(), null, null);
+    }
+
+    private AiRoadmapDto.ChatResponse proposeEdit(String userId, AiRoadmap roadmap,
+                                                   AiRoadmapDto.ChatRequest request, boolean replace) {
+        AiRoadmapItem item = resolveTargetItem(roadmap, request);
+        AiRoadmapDto.RoadmapItemDraft draft = request.after();
+        if (draft == null || (draft.title() == null && draft.description() == null)) return unsupportedGuide();
+        String title = draft.title() != null ? draft.title() : item.getTitle();
+        RoadmapStage stage = draft.targetStage() != null ? draft.targetStage() : item.getTargetStage();
+        RoadmapLane lane = draft.roadmapLane() != null ? draft.roadmapLane() : item.getRoadmapLane();
+        validateNoDuplicate(roadmap, title, stage, lane, item.getAiRoadmapItemId());
+        Map<String, Object> before = itemSnapshot(item);
+        Map<String, Object> after = new LinkedHashMap<>(before);
+        if (draft.title() != null) after.put("title", draft.title().trim());
+        if (draft.description() != null) after.put("description", draft.description());
+        if (replace && draft.itemType() != null) after.put("itemType", draft.itemType().name());
+        AiRoadmapChangeProposal.ActionType action = replace
+                ? AiRoadmapChangeProposal.ActionType.REPLACE_ITEM : AiRoadmapChangeProposal.ActionType.EDIT_ITEM;
+        String message = "'" + item.getTitle() + "' 항목을 " + (replace ? "교체" : "수정") + "합니다.";
+        AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap, action,
+                item.getAiRoadmapItemId(), null, null, null, message, before, after);
+        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
+    }
+
+    private AiRoadmapDto.ChatResponse proposeMove(String userId, AiRoadmap roadmap,
+                                                   AiRoadmapDto.ChatRequest request) {
+        AiRoadmapItem item = resolveTargetItem(roadmap, request);
+        AiRoadmapDto.RoadmapItemDraft draft = request.after();
+        RoadmapStage stage = firstNonNull(draft == null ? null : draft.targetStage(),
+                request.selectedStage(), item.getTargetStage());
+        RoadmapLane lane = firstNonNull(draft == null ? null : draft.roadmapLane(),
+                request.selectedLane(), item.getRoadmapLane());
+        Integer displayOrder = draft == null ? item.getDisplayOrder() :
+                (draft.displayOrder() == null ? item.getDisplayOrder() : draft.displayOrder());
+        validateNoDuplicate(roadmap, item.getTitle(), stage, lane, item.getAiRoadmapItemId());
+        Map<String, Object> before = itemSnapshot(item);
+        Map<String, Object> after = new LinkedHashMap<>(before);
+        after.put("targetStage", stage.name());
+        after.put("roadmapLane", lane.name());
+        after.put("displayOrder", displayOrder);
+        String message = "'" + item.getTitle() + "' 항목을 " + stage.name() + " / " + lane.name() + " 영역으로 이동합니다.";
+        AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
+                AiRoadmapChangeProposal.ActionType.MOVE_ITEM, item.getAiRoadmapItemId(), null,
+                null, null, message, before, after);
+        return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
     private AiRoadmapDto.ChatResponse proposeItemChange(String userId, AiRoadmap roadmap,
                                                          AiRoadmapDto.ChatRequest request,
                                                          AiRoadmapChangeProposal.ActionType actionType) {
         AiRoadmapItem item = resolveTargetItem(roadmap, request);
-        String verb = actionType == AiRoadmapChangeProposal.ActionType.COMPLETE_ROADMAP_ITEM
-                ? "완료 상태로 변경" : "로드맵에서 제외";
-        String message = "'" + item.getStandardItem().getTitle() + "' 항목을 " + verb
+        String verb = switch (actionType) {
+            case COMPLETE_ITEM -> "완료 상태로 변경";
+            case REOPEN_ITEM -> "미완료 상태로 변경";
+            default -> "로드맵에서 제외";
+        };
+        String message = "'" + item.getTitle() + "' 항목을 " + verb
                 + "합니다. 확인 후에만 실제 로드맵에 반영됩니다.";
+        Map<String, Object> before = itemSnapshot(item);
+        Map<String, Object> after = new LinkedHashMap<>(before);
+        after.put("status", switch (actionType) {
+            case COMPLETE_ITEM -> AiRoadmapItem.Status.COMPLETED.name();
+            case REOPEN_ITEM -> AiRoadmapItem.Status.PENDING.name();
+            default -> AiRoadmapItem.Status.HIDDEN.name();
+        });
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap, actionType,
-                item.getAiRoadmapItemId(), null, null, null, message);
+                item.getAiRoadmapItemId(), null, null, null, message, before, after);
         return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
@@ -189,21 +323,23 @@ public class AiRoadmapChatService {
                                                              AiRoadmapDto.ChatRequest request) {
         AiRoadmapItem item = resolveTargetItem(roadmap, request);
         AiRoadmapStandardItem.Priority priority = resolvePriority(request.message());
-        String message = "'" + item.getStandardItem().getTitle() + "' 항목의 우선순위를 "
+        String message = "'" + item.getTitle() + "' 항목의 우선순위를 "
                 + priorityName(priority) + "(으)로 변경합니다.";
+        Map<String, Object> before = itemSnapshot(item);
+        Map<String, Object> after = new LinkedHashMap<>(before);
+        after.put("priority", priority.name());
         AiRoadmapChangeProposal proposal = saveProposal(userId, roadmap,
                 AiRoadmapChangeProposal.ActionType.CHANGE_PRIORITY,
-                item.getAiRoadmapItemId(), null, null, priority, message);
+                item.getAiRoadmapItemId(), null, null, priority, message, before, after);
         return responseWithProposal(message, proposal, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
     }
 
     private AiRoadmapDto.ChatResponse explainItem(AiRoadmap roadmap, AiRoadmapDto.ChatRequest request) {
         AiRoadmapItem item = resolveTargetItem(roadmap, request);
-        AiRoadmapStandardItem standard = item.getStandardItem();
-        String message = "'" + standard.getTitle() + "'은(는) "
-                + Optional.ofNullable(standard.getDescription()).filter(value -> !value.isBlank())
+        String message = "'" + item.getTitle() + "'은(는) "
+                + Optional.ofNullable(item.getDescription()).filter(value -> !value.isBlank())
                 .orElse("등록된 상세 설명이 없는 활동입니다.")
-                + reasonSuffix(standard.getRecommendationReason());
+                + reasonSuffix(item.getRecommendationReason());
         return new AiRoadmapDto.ChatResponse(message,
                 AiRoadmapChangeProposal.ActionType.EXPLAIN_ROADMAP_ITEM,
                 false, null, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
@@ -219,14 +355,14 @@ public class AiRoadmapChatService {
             Optional<AiRoadmapItem> first = aiRoadmapService.getAllItems(roadmap).stream()
                     .filter(item -> item.getStatus() != AiRoadmapItem.Status.COMPLETED
                             && item.getStatus() != AiRoadmapItem.Status.HIDDEN)
-                    .filter(item -> Objects.equals(item.getStandardItem().getTargetGrade(), grade))
+                    .filter(item -> Objects.equals(item.getTargetGrade(), grade))
                     .sorted(Comparator.comparing(AiRoadmapItem::getPriority)
-                            .thenComparing(item -> item.getStandardItem().getDisplayOrder()))
+                            .thenComparing(AiRoadmapItem::getDisplayOrder))
                     .findFirst();
             if (first.isPresent()) {
                 AiRoadmapItem item = first.get();
-                String message = "현재 가장 먼저 준비할 활동은 '" + item.getStandardItem().getTitle()
-                        + "'입니다." + reasonSuffix(item.getStandardItem().getRecommendationReason());
+                String message = "현재 가장 먼저 준비할 활동은 '" + item.getTitle()
+                        + "'입니다." + reasonSuffix(item.getRecommendationReason());
                 return new AiRoadmapDto.ChatResponse(message, AiRoadmapChangeProposal.ActionType.NO_ACTION,
                         false, null, List.of(), AiRoadmapDto.ItemResponse.from(item), null);
             }
@@ -250,8 +386,12 @@ public class AiRoadmapChatService {
 
         switch (proposal.getActionType()) {
             case ADD_ROADMAP_ITEM -> applyAdd(roadmap, proposal);
-            case HIDE_ROADMAP_ITEM -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId()).hide();
-            case COMPLETE_ROADMAP_ITEM -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId()).complete(true);
+            case ADD_CUSTOM_ITEM -> applyCustomAdd(roadmap, proposal);
+            case EDIT_ITEM, REPLACE_ITEM -> applyEdit(roadmap, proposal);
+            case MOVE_ITEM -> applyMove(roadmap, proposal);
+            case REMOVE_ITEM, HIDE_ROADMAP_ITEM -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId()).hide();
+            case COMPLETE_ITEM, COMPLETE_ROADMAP_ITEM -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId()).complete(true);
+            case REOPEN_ITEM -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId()).reopen();
             case CHANGE_PRIORITY -> aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId())
                     .changePriority(requirePriority(proposal));
             case CHANGE_INTEREST_JOB -> applyJobChange(userId, roadmap, proposal);
@@ -278,6 +418,40 @@ public class AiRoadmapChatService {
         );
     }
 
+    private void applyCustomAdd(AiRoadmap roadmap, AiRoadmapChangeProposal proposal) {
+        Map<String, Object> after = proposal.readAfterSnapshot();
+        String title = requiredString(after, "title");
+        RoadmapStage stage = enumValue(after, "targetStage", RoadmapStage.class);
+        RoadmapLane lane = enumValue(after, "roadmapLane", RoadmapLane.class);
+        RoadmapItemType itemType = enumValue(after, "itemType", RoadmapItemType.class);
+        validateNoDuplicate(roadmap, title, stage, lane, null);
+        AiRoadmapStandardItem.Priority priority = enumValueOrDefault(after, "priority",
+                AiRoadmapStandardItem.Priority.class, AiRoadmapStandardItem.Priority.MEDIUM);
+        aiRoadmapService.itemRepository().save(AiRoadmapItem.createCustom(
+                roadmap, title, stringValue(after, "description"), lane, itemType, stage,
+                intValue(after, "displayOrder", 999), priority));
+    }
+
+    private void applyEdit(AiRoadmap roadmap, AiRoadmapChangeProposal proposal) {
+        AiRoadmapItem item = aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId());
+        Map<String, Object> after = proposal.readAfterSnapshot();
+        String title = stringValue(after, "title");
+        RoadmapStage stage = enumValueOrDefault(after, "targetStage", RoadmapStage.class, item.getTargetStage());
+        RoadmapLane lane = enumValueOrDefault(after, "roadmapLane", RoadmapLane.class, item.getRoadmapLane());
+        validateNoDuplicate(roadmap, title != null ? title : item.getTitle(), stage, lane, item.getAiRoadmapItemId());
+        item.edit(title, stringValue(after, "description"));
+        if (after.containsKey("itemType")) item.changeItemType(enumValue(after, "itemType", RoadmapItemType.class));
+    }
+
+    private void applyMove(AiRoadmap roadmap, AiRoadmapChangeProposal proposal) {
+        AiRoadmapItem item = aiRoadmapService.findOwnedItem(roadmap, proposal.getTargetRoadmapItemId());
+        Map<String, Object> after = proposal.readAfterSnapshot();
+        RoadmapStage stage = enumValueOrDefault(after, "targetStage", RoadmapStage.class, item.getTargetStage());
+        RoadmapLane lane = enumValueOrDefault(after, "roadmapLane", RoadmapLane.class, item.getRoadmapLane());
+        validateNoDuplicate(roadmap, item.getTitle(), stage, lane, item.getAiRoadmapItemId());
+        item.move(stage, lane, intValue(after, "displayOrder", item.getDisplayOrder()));
+    }
+
     private void applyJobChange(String userId, AiRoadmap oldRoadmap, AiRoadmapChangeProposal proposal) {
         Long targetJobId = proposal.getTargetJobId();
         if (targetJobId == null || Objects.equals(targetJobId, oldRoadmap.getInterestJob().getJobId())) {
@@ -286,13 +460,13 @@ public class AiRoadmapChatService {
 
         Set<String> completedKeys = aiRoadmapService.getAllItems(oldRoadmap).stream()
                 .filter(item -> item.getStatus() == AiRoadmapItem.Status.COMPLETED)
-                .map(item -> completionKey(item.getStandardItem()))
+                .map(this::completionKey)
                 .collect(Collectors.toSet());
 
         aiRoadmapService.replaceInterestJob(userId, targetJobId);
         AiRoadmap newRoadmap = aiRoadmapService.findRoadmap(userId);
         for (AiRoadmapItem item : aiRoadmapService.getAllItems(newRoadmap)) {
-            if (completedKeys.contains(completionKey(item.getStandardItem()))) {
+            if (completedKeys.contains(completionKey(item))) {
                 item.complete(true);
             }
         }
@@ -321,7 +495,7 @@ public class AiRoadmapChatService {
         return aiRoadmapService.getAllItems(roadmap).stream()
                 .filter(item -> item.getStatus() != AiRoadmapItem.Status.HIDDEN)
                 .filter(item -> {
-                    String title = normalize(item.getStandardItem().getTitle());
+                    String title = normalize(item.getTitle());
                     return message.contains(title) || title.contains(message);
                 })
                 .findFirst()
@@ -336,6 +510,17 @@ public class AiRoadmapChatService {
         Member member = profileAnalyzer.getMemberWithTracks(userId);
         return proposalRepository.save(AiRoadmapChangeProposal.create(member, roadmap, actionType,
                 targetRoadmapItemId, targetStandardItemId, targetJobId, targetPriority, message));
+    }
+
+    private AiRoadmapChangeProposal saveProposal(String userId, AiRoadmap roadmap,
+                                                   AiRoadmapChangeProposal.ActionType actionType,
+                                                   Long targetRoadmapItemId, Long targetStandardItemId,
+                                                   Long targetJobId, AiRoadmapStandardItem.Priority targetPriority,
+                                                   String message, Map<String, Object> before,
+                                                   Map<String, Object> after) {
+        Member member = profileAnalyzer.getMemberWithTracks(userId);
+        return proposalRepository.save(AiRoadmapChangeProposal.create(member, roadmap, actionType,
+                targetRoadmapItemId, targetStandardItemId, targetJobId, targetPriority, message, before, after));
     }
 
     private AiRoadmapDto.ChatResponse responseWithProposal(String message, AiRoadmapChangeProposal proposal,
@@ -370,7 +555,11 @@ public class AiRoadmapChatService {
     }
 
     private String completionKey(AiRoadmapStandardItem standard) {
-        return standard.getCategory().name() + "|" + normalize(standard.getTitle());
+        return standard.getRoadmapLaneEffective().name() + "|" + normalize(standard.getTitle());
+    }
+
+    private String completionKey(AiRoadmapItem item) {
+        return item.getRoadmapLane().name() + "|" + normalize(item.getTitle());
     }
 
     private String normalize(String value) {
@@ -379,6 +568,86 @@ public class AiRoadmapChatService {
 
     private boolean containsAny(String value, String... keywords) {
         return Arrays.stream(keywords).anyMatch(value::contains);
+    }
+
+    private Map<String, Object> itemSnapshot(AiRoadmapItem item) {
+        return draftSnapshot(item.getTitle(), item.getDescription(), item.getRoadmapLane(), item.getItemType(),
+                item.getTargetStage(), item.getDisplayOrder(), item.getPriority(), item.getStatus());
+    }
+
+    private Map<String, Object> draftSnapshot(String title, String description, RoadmapLane lane,
+                                               RoadmapItemType itemType, RoadmapStage stage,
+                                               Integer displayOrder, AiRoadmapStandardItem.Priority priority) {
+        return draftSnapshot(title, description, lane, itemType, stage, displayOrder, priority,
+                AiRoadmapItem.Status.PENDING);
+    }
+
+    private Map<String, Object> draftSnapshot(String title, String description, RoadmapLane lane,
+                                               RoadmapItemType itemType, RoadmapStage stage,
+                                               Integer displayOrder, AiRoadmapStandardItem.Priority priority,
+                                               AiRoadmapItem.Status status) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (title != null) snapshot.put("title", title.trim());
+        if (description != null) snapshot.put("description", description);
+        if (lane != null) snapshot.put("roadmapLane", lane.name());
+        if (itemType != null) snapshot.put("itemType", itemType.name());
+        if (stage != null) snapshot.put("targetStage", stage.name());
+        if (displayOrder != null) snapshot.put("displayOrder", displayOrder);
+        if (priority != null) snapshot.put("priority", priority.name());
+        if (status != null) snapshot.put("status", status.name());
+        return snapshot;
+    }
+
+    private void validateNoDuplicate(AiRoadmap roadmap, String title, RoadmapStage stage,
+                                     RoadmapLane lane, Long excludedId) {
+        String normalizedTitle = normalize(title);
+        boolean duplicated = aiRoadmapService.getAllItems(roadmap).stream()
+                .filter(item -> item.getStatus() != AiRoadmapItem.Status.HIDDEN)
+                .filter(item -> excludedId == null || !Objects.equals(item.getAiRoadmapItemId(), excludedId))
+                .anyMatch(item -> normalize(item.getTitle()).equals(normalizedTitle)
+                        && item.getTargetStage() == stage && item.getRoadmapLane() == lane);
+        if (duplicated) throw new BaseException(AiRoadmapResponseCode.INVALID_PROPOSAL_STATE);
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        return Arrays.stream(values).filter(Objects::nonNull).findFirst().orElse(null);
+    }
+
+    private String requiredString(Map<String, Object> values, String key) {
+        String value = stringValue(values, key);
+        if (value == null || value.isBlank()) throw new BaseException(AiRoadmapResponseCode.INVALID_PROPOSAL_STATE);
+        return value;
+    }
+
+    private String stringValue(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private int intValue(Map<String, Object> values, String key, int fallback) {
+        Object value = values.get(key);
+        if (value instanceof Number number) return number.intValue();
+        if (value == null) return fallback;
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException exception) {
+            throw new BaseException(AiRoadmapResponseCode.INVALID_PROPOSAL_STATE);
+        }
+    }
+
+    private <E extends Enum<E>> E enumValue(Map<String, Object> values, String key, Class<E> type) {
+        String value = requiredString(values, key);
+        try {
+            return Enum.valueOf(type, value);
+        } catch (IllegalArgumentException exception) {
+            throw new BaseException(AiRoadmapResponseCode.INVALID_PROPOSAL_STATE);
+        }
+    }
+
+    private <E extends Enum<E>> E enumValueOrDefault(Map<String, Object> values, String key,
+                                                      Class<E> type, E fallback) {
+        return values.containsKey(key) ? enumValue(values, key, type) : fallback;
     }
 
     private String reasonSuffix(String reason) {

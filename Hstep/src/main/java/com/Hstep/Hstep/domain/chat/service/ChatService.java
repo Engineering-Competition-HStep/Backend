@@ -2,6 +2,7 @@ package com.Hstep.Hstep.domain.chat.service;
 
 import com.Hstep.Hstep.domain.chat.dto.ChatMessageDto;
 import com.Hstep.Hstep.domain.chat.dto.ChatRoomDto;
+import com.Hstep.Hstep.domain.chat.constant.ChatScenario;
 import com.Hstep.Hstep.domain.chat.entity.ChatMessage;
 import com.Hstep.Hstep.domain.chat.entity.ChatRole;
 import com.Hstep.Hstep.domain.chat.entity.ChatRoom;
@@ -9,6 +10,7 @@ import com.Hstep.Hstep.domain.chat.exception.ChatResponseCode;
 import com.Hstep.Hstep.domain.chat.repository.ChatMessageRepository;
 import com.Hstep.Hstep.domain.chat.repository.ChatRoomRepository;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
+import com.Hstep.Hstep.domain.member.entity.Member;
 import com.Hstep.Hstep.global.exception.BaseException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,36 @@ public class ChatService {
     public ChatMessage appendMessage(String userId, Long chatRoomId, ChatRole role, String content) {
         ChatRoom chatRoom = getOwnedRoom(userId, chatRoomId);
         return chatMessageRepository.save(new ChatMessage(role, content, chatRoom));
+    }
+
+    @Transactional
+    public ChatRoom getOrCreateRoadmapRoom(String userId, Long roadmapId) {
+        return chatRoomRepository.findByMember_UserIdAndScenarioAndReferenceId(
+                        userId, ChatScenario.AI_ROADMAP, roadmapId)
+                .orElseGet(() -> {
+                    Member member = memberRepository.findById(userId)
+                            .orElseThrow(() -> new BaseException(ChatResponseCode.CHAT_ROOM_NOT_FOUND));
+                    return chatRoomRepository.save(new ChatRoom(
+                            "AI 개인 맞춤 로드맵", ChatScenario.AI_ROADMAP, member, roadmapId));
+                });
+    }
+
+    @Transactional
+    public ChatMessage appendRoadmapMessage(ChatRoom room, ChatRole role, String content, String proposalId) {
+        return chatMessageRepository.save(new ChatMessage(role, content, room, proposalId));
+    }
+
+    public List<ChatMessage> findRoadmapMessages(String userId, Long roadmapId) {
+        return chatRoomRepository.findByMember_UserIdAndScenarioAndReferenceId(
+                        userId, ChatScenario.AI_ROADMAP, roadmapId)
+                .map(room -> chatMessageRepository.findByChatRoom_ChatRoomIdOrderByCreatedAtAsc(room.getChatRoomId()))
+                .orElse(List.of());
+    }
+
+    public ChatRoom findRoadmapRoom(String userId, Long roadmapId) {
+        return chatRoomRepository.findByMember_UserIdAndScenarioAndReferenceId(
+                        userId, ChatScenario.AI_ROADMAP, roadmapId)
+                .orElse(null);
     }
 
     private ChatRoom getOwnedRoom(String userId, Long chatRoomId) {

@@ -113,6 +113,7 @@ public class ChatConversationService {
         return switch (scenario) {
             case TRACK_CAREER_ANALYSIS -> ChatSystemPrompts.TRACK_CAREER_ANALYSIS;
             case RECOMMENDED_JOB -> ChatSystemPrompts.RECOMMENDED_JOB;
+            case AI_ROADMAP -> "AI 개인 맞춤 로드맵의 항목 설명과 안전한 변경 제안만 제공합니다.";
         };
     }
 
@@ -120,6 +121,7 @@ public class ChatConversationService {
         return switch (scenario) {
             case TRACK_CAREER_ANALYSIS -> "내 트랙 취업 분석";
             case RECOMMENDED_JOB -> "추천 직무";
+            case AI_ROADMAP -> "AI 개인 맞춤 로드맵";
         };
     }
 

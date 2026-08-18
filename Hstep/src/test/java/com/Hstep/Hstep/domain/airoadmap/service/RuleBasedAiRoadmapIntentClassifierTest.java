@@ -20,11 +20,11 @@ class RuleBasedAiRoadmapIntentClassifierTest {
         assertThat(classifier.classify("관심 직무를 변경하고 싶어"))
                 .isEqualTo(AiRoadmapChangeProposal.ActionType.CHANGE_INTEREST_JOB);
         assertThat(classifier.classify("프로젝트를 추가해줘"))
-                .isEqualTo(AiRoadmapChangeProposal.ActionType.ADD_ROADMAP_ITEM);
+                .isEqualTo(AiRoadmapChangeProposal.ActionType.ADD_CUSTOM_ITEM);
         assertThat(classifier.classify("이 활동 완료했어"))
-                .isEqualTo(AiRoadmapChangeProposal.ActionType.COMPLETE_ROADMAP_ITEM);
+                .isEqualTo(AiRoadmapChangeProposal.ActionType.COMPLETE_ITEM);
         assertThat(classifier.classify("이 활동은 로드맵에서 제외해줘"))
-                .isEqualTo(AiRoadmapChangeProposal.ActionType.HIDE_ROADMAP_ITEM);
+                .isEqualTo(AiRoadmapChangeProposal.ActionType.REMOVE_ITEM);
         assertThat(classifier.classify("이 항목 우선순위를 높여줘"))
                 .isEqualTo(AiRoadmapChangeProposal.ActionType.CHANGE_PRIORITY);
         assertThat(classifier.classify("이 활동을 왜 해야 하는지 설명해줘"))

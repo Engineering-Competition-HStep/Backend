@@ -1,0 +1,20 @@
+package com.Hstep.Hstep.domain.airoadmap.entity;
+
+public enum RoadmapItemType {
+    PROGRAMMING_LANGUAGE,
+    CS_SUBJECT,
+    FRAMEWORK,
+    DEVELOPMENT_TOOL,
+    MINI_PROJECT,
+    TEAM_PROJECT,
+    PORTFOLIO_PROJECT,
+    CERTIFICATE,
+    VENDOR_CERTIFICATION,
+    CONTEST,
+    HACKATHON,
+    INTERNSHIP,
+    EXTERNAL_ACTIVITY,
+    OPEN_SOURCE,
+    JOB_PREPARATION,
+    OTHER
+}
