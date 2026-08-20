@@ -3,13 +3,14 @@ package com.Hstep.Hstep.domain.auth.service;
 import com.Hstep.Hstep.domain.auth.entity.EmailVerification;
 import com.Hstep.Hstep.domain.auth.repository.EmailVerificationRepository;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -18,6 +19,7 @@ import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,10 +47,13 @@ class EmailVerificationServiceTest {
     }
 
     @Test
-    void sendVerificationStoresTokenAndSendsMail() {
+    void sendVerificationStoresTokenAndSendsHtmlMail() throws Exception {
         when(memberRepository.existsByEmail("student@hansung.ac.kr")).thenReturn(false);
         when(emailVerificationRepository.save(any(EmailVerification.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+
+        MimeMessage mimeMessage = new MimeMessage(Session.getInstance(new Properties()));
+        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         service.sendVerification("Student@hansung.ac.kr");
 
@@ -58,10 +63,10 @@ class EmailVerificationServiceTest {
         assertThat(entityCaptor.getValue().getEmail()).isEqualTo("student@hansung.ac.kr");
         assertThat(entityCaptor.getValue().getTokenHash()).hasSize(64);
 
-        ArgumentCaptor<SimpleMailMessage> mailCaptor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(mailCaptor.capture());
-        assertThat(mailCaptor.getValue().getTo()).containsExactly("student@hansung.ac.kr");
-        assertThat(mailCaptor.getValue().getText()).contains("/api/auth/email-verifications/verify?token=");
+        verify(mailSender).send(mimeMessage);
+        assertThat(mimeMessage.getAllRecipients()[0].toString()).isEqualTo("student@hansung.ac.kr");
+        assertThat(mimeMessage.getSubject()).contains("HSTEP");
+        assertThat(mimeMessage.getContent().toString()).contains("확인하기");
     }
 
     @Test

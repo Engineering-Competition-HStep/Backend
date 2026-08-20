@@ -5,11 +5,13 @@ import com.Hstep.Hstep.domain.auth.exception.AuthResponseCode;
 import com.Hstep.Hstep.domain.auth.repository.EmailVerificationRepository;
 import com.Hstep.Hstep.domain.member.repository.MemberRepository;
 import com.Hstep.Hstep.global.exception.BaseException;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,21 +60,15 @@ public class EmailVerificationService {
         String verificationUrl = trimTrailingSlash(verifyBaseUrl)
                 + "/api/auth/email-verifications/verify?token=" + rawToken;
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromAddress);
-        message.setTo(email);
-        message.setSubject("[HSTEP] 한성대학교 이메일 인증");
-        message.setText(
-                "HSTEP 회원가입을 위한 이메일 인증 요청입니다.\n\n"
-                        + "아래 링크를 클릭하면 이메일 인증이 완료됩니다.\n"
-                        + verificationUrl + "\n\n"
-                        + "인증 링크는 " + expirationMinutes + "분 동안 유효합니다.\n"
-                        + "본인이 요청하지 않았다면 이 메일을 무시해주세요."
-        );
-
         try {
-            mailSender.send(message);
-        } catch (MailException exception) {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, StandardCharsets.UTF_8.name());
+            helper.setFrom(fromAddress);
+            helper.setTo(email);
+            helper.setSubject("[HSTEP] 한성대학교 이메일 인증");
+            helper.setText(buildVerificationMail(verificationUrl), true);
+            mailSender.send(mimeMessage);
+        } catch (MessagingException | MailException exception) {
             throw new BaseException(AuthResponseCode.EMAIL_SEND_FAILED);
         }
     }
@@ -109,6 +105,24 @@ public class EmailVerificationService {
     @Transactional
     public void consumeVerified(String rawEmail) {
         emailVerificationRepository.deleteByEmail(normalizeEmail(rawEmail));
+    }
+
+    private String buildVerificationMail(String verificationUrl) {
+        return """
+                <!doctype html>
+                <html lang="ko">
+                <body style="font-family:Arial,sans-serif;color:#222;line-height:1.6;">
+                  <h2>HSTEP 학교 이메일 인증</h2>
+                  <p>HSTEP 회원가입을 위한 이메일 인증 요청입니다.</p>
+                  <p>아래 버튼을 클릭하면 학교 이메일 인증이 자동으로 완료됩니다.</p>
+                  <p style="margin:28px 0;">
+                    <a href="%s" style="display:inline-block;padding:12px 24px;background:#144574;color:#fff;text-decoration:none;border-radius:6px;">확인하기</a>
+                  </p>
+                  <p>인증 링크는 %d분 동안 유효합니다.</p>
+                  <p>본인이 요청하지 않았다면 이 메일을 무시해주세요.</p>
+                </body>
+                </html>
+                """.formatted(verificationUrl, expirationMinutes);
     }
 
     private String normalizeEmail(String email) {
