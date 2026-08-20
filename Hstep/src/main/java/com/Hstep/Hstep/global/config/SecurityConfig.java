@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/check/**").permitAll()
+                        .requestMatchers("/api/auth/email-verifications/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/tracks").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/roadmaps/base/**").hasRole("ADMIN")

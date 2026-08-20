@@ -28,6 +28,7 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public MemberRes signup(SignupReq signupReq) {
@@ -40,6 +41,7 @@ public class AuthService {
             throw new BaseException(AuthResponseCode.EMAIL_DUPLICATION);
         }
 
+        emailVerificationService.requireVerified(normalizedEmail);
         validateTracks(signupReq.getTrackIds());
 
         Member member = Member.create(
@@ -52,7 +54,9 @@ public class AuthService {
         member.replaceTracks(signupReq.getTrackIds());
 
         try {
-            return MemberRes.fromEntity(memberRepository.save(member));
+            Member savedMember = memberRepository.save(member);
+            emailVerificationService.consumeVerified(normalizedEmail);
+            return MemberRes.fromEntity(savedMember);
         } catch (DataIntegrityViolationException exception) {
             throw new BaseException(AuthResponseCode.USER_ID_DUPLICATION);
         }
