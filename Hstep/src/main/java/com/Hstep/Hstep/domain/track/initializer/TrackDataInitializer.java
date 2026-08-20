@@ -67,8 +67,6 @@ public class TrackDataInitializer implements ApplicationRunner {
                 seed("TRACK_FASHION_MARKETING", "패션마케팅트랙"),
                 seed("TRACK_FASHION_DESIGN", "패션디자인트랙"),
                 seed("TRACK_FASHION_CREATIVE_DIRECTION", "패션크리에이티브디렉션트랙"),
-                seed("TRACK_NEW_MEDIA_AD_COMMUNICATION_DESIGN", "뉴미디어 광고·커뮤니케이션디자인트랙"),
-                seed("TRACK_BRAND_PACKAGE_DESIGN", "브랜드·패키지디자인트랙"),
                 seed("TRACK_VIDEO_ANIMATION_DESIGN", "영상·애니메이션디자인트랙"),
                 seed("TRACK_UX_UI_DESIGN", "UX/UI디자인트랙"),
                 seed("TRACK_GAME_GRAPHIC_DESIGN", "게임그래픽디자인트랙"),
@@ -99,7 +97,24 @@ public class TrackDataInitializer implements ApplicationRunner {
                 seed("TRACK_MECHANICAL_DESIGN", "기계설계트랙"),
                 seed("TRACK_MECHANICAL_AUTOMATION", "기계자동화트랙"),
                 seed("TRACK_INDUSTRIAL_ENGINEERING", "산업공학트랙"),
-                seed("TRACK_INTELLIGENT_MANUFACTURING_SYSTEM", "지능형제조시스템트랙")
+                seed("TRACK_INTELLIGENT_SYSTEM", "지능시스템트랙"),
+
+                // 신규 트랙 (BaseRoadmap 데이터 검토 과정에서 추가)
+                seed("NEW-005", "이민ㆍ다문화트랙"),
+                seed("NEW-008", "금융ㆍ데이터분석트랙"),
+                seed("NEW-016", "미디어디자인트랙"),
+                seed("NEW-017", "비즈니스애널리틱스트랙"),
+                seed("NEW-022", "AI로봇융합트랙"),
+                seed("NEW-023", "기계시스템디자인트랙"),
+                seed("NEW-033", "스마트제조혁신컨설팅학과"),
+                seed("NEW-034", "응용산업데이터공학트랙"),
+                seed("NEW-036", "역사문화큐레이션트랙"),
+                seed("NEW-037", "미래모빌리티학과"),
+                seed("NEW-038", "시각디자인트랙"),
+                seed("NEW-039", "문학문화콘텐츠학과"),
+                seed("NEW-040", "융합보안학과"),
+                seed("NEW-041", "AI응용학과"),
+                seed("NEW-043", "정보시스템트랙")
         );
     }
 
